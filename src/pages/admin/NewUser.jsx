@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
+import AdminLayout from '../../components/AdminLayout'
 
 export default function NewUser() {
   const navigate = useNavigate()
@@ -125,7 +126,8 @@ export default function NewUser() {
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
+    <AdminLayout>
+      <div className="p-6 max-w-2xl mx-auto">
       <div className="mb-6">
         <button
           onClick={() => navigate('/admin/users')}
@@ -237,6 +239,7 @@ export default function NewUser() {
           </button>
         </div>
       </form>
-    </div>
+      </div>
+    </AdminLayout>
   )
 }

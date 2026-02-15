@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
+import AdminLayout from '../../components/AdminLayout'
 
 export default function UsersList() {
   const [users, setUsers] = useState([])
@@ -122,7 +123,8 @@ export default function UsersList() {
   }
 
   return (
-    <div className="p-6">
+    <AdminLayout>
+      <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Gestion des Utilisateurs</h1>
         <Link
@@ -274,6 +276,7 @@ export default function UsersList() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </AdminLayout>
   )
 }
