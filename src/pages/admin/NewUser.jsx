@@ -44,22 +44,6 @@ export default function NewUser() {
     try {
       console.log('📝 Création de l\'utilisateur...', formData)
 
-      // MÉTHODE 1: Via Edge Function (recommandé en production)
-      // Décommentez quand vous aurez créé l'Edge Function
-      /*
-      const { data, error } = await supabase.functions.invoke('create-user', {
-        body: {
-          email: formData.email,
-          password: formData.password,
-          full_name: formData.full_name,
-          role_id: formData.role_id
-        }
-      })
-
-      if (error) throw error
-      */
-
-      // MÉTHODE 2: Directement avec service_role (TEMPORAIRE - dev uniquement)
       // Créer l'utilisateur dans Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
@@ -67,8 +51,7 @@ export default function NewUser() {
         options: {
           data: {
             full_name: formData.full_name
-          },
-          emailRedirectTo: undefined // Pas de confirmation email en dev
+          }
         }
       })
 
@@ -88,7 +71,7 @@ export default function NewUser() {
             id: authData.user.id,
             email: formData.email,
             full_name: formData.full_name,
-            role_id: parseInt(formData.role_id),
+            role_id: formData.role_id,
             is_active: true
           }
         ])
@@ -140,8 +123,8 @@ export default function NewUser() {
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
         <p className="text-sm text-blue-800">
-          ℹ️ <strong>Mode développement:</strong> L'utilisateur sera créé via signUp. 
-          En production, utilisez une Edge Function sécurisée avec service_role.
+          ℹ️ <strong>Important:</strong> Assurez-vous que la confirmation email est désactivée dans Supabase 
+          (Authentication → Providers → Email → Décocher "Confirm email")
         </p>
       </div>
 
