@@ -15,9 +15,11 @@ export default function AgencesList() {
     nom: ''
   })
 
+  // Chargement initial des agences au montage du composant
   useEffect(() => {
     fetchAgences()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // fetchAgences est stable
 
   const fetchAgences = async () => {
     try {

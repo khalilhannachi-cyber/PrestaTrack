@@ -14,9 +14,11 @@ export default function NewUser() {
     role_id: ''
   })
 
+  // Chargement initial des rôles disponibles au montage du composant
   useEffect(() => {
     fetchRoles()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // fetchRoles est stable
 
   const fetchRoles = async () => {
     try {
