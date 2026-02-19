@@ -10,7 +10,9 @@ export default function Dashboard() {
 
   console.log('📊 [Dashboard] Rendu avec:', { email: user?.email, role })
 
-  // Redirection automatique selon le rôle
+  // Redirection automatique selon le rôle au montage du composant
+  // ⚠️ Important : Ne s'exécute qu'une fois au montage pour éviter les boucles de redirection
+  // Le rôle ne devrait pas changer pendant la durée de vie de ce composant
   useEffect(() => {
     if (role === 'ADMIN') {
       console.log('🔀 [Dashboard] Redirection Admin vers /admin/users')
@@ -22,7 +24,8 @@ export default function Dashboard() {
       console.log('🔀 [Dashboard] Redirection Finance vers /finance/dashboard')
       // navigate('/finance/dashboard', { replace: true })
     }
-  }, [role, navigate])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // On évite [role, navigate] pour ne rediriger qu'une seule fois
 
   // Fonction de déconnexion
   const handleLogout = async () => {

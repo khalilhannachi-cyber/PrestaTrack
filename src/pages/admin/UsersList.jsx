@@ -10,10 +10,12 @@ export default function UsersList() {
   const [editingUser, setEditingUser] = useState(null)
   const [newRoleId, setNewRoleId] = useState('')
 
+  // Chargement initial des utilisateurs et rôles au montage du composant
   useEffect(() => {
     fetchUsers()
     fetchRoles()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Les fonctions fetch sont stables
 
   const fetchUsers = async () => {
     try {
