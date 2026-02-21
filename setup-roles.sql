@@ -38,6 +38,23 @@ BEGIN
   END IF;
 END $$;
 
+-- Ajouter une contrainte pour valider les emails @comar.tn uniquement
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'users_email_comar_check'
+  ) THEN
+    ALTER TABLE public.users
+    ADD CONSTRAINT users_email_comar_check
+    CHECK (email ILIKE '%@comar.tn');
+    
+    RAISE NOTICE '✅ Contrainte email @comar.tn ajoutée';
+  ELSE
+    RAISE NOTICE 'ℹ️ Contrainte email @comar.tn déjà existante';
+  END IF;
+END $$;
+
 -- ============================================================================
 -- NETTOYAGE : Suppression des politiques existantes
 -- ============================================================================
