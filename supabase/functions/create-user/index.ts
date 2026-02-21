@@ -13,7 +13,10 @@ serve(async (req) => {
   }
 
   try {
+    console.log('📝 Début de la fonction create-user')
+    
     // Créer un client Supabase avec la clé service_role (admin)
+    // pour créer le nouvel utilisateur
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -24,6 +27,8 @@ serve(async (req) => {
         }
       }
     )
+    
+    console.log('✅ Client admin créé')
 
     // Récupérer les données de la requête
     const { email, password, full_name, role_id } = await req.json()
@@ -86,7 +91,7 @@ serve(async (req) => {
     console.log('✅ Utilisateur créé dans Auth:', authData.user.id)
 
     // Insérer dans la table public.users
-    const { error: userError } = await supabaseAdmin
+    const { error: insertError } = await supabaseAdmin
       .from('users')
       .insert({
         id: authData.user.id,
@@ -96,13 +101,13 @@ serve(async (req) => {
         is_active: true
       })
 
-    if (userError) {
-      console.error('❌ Erreur insertion users:', userError)
+    if (insertError) {
+      console.error('❌ Erreur insertion users:', insertError)
       
       // Supprimer l'utilisateur Auth si l'insertion dans users échoue
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
       
-      throw userError
+      throw insertError
     }
 
     console.log('✅ Utilisateur inséré dans la table users')
@@ -125,9 +130,11 @@ serve(async (req) => {
   } catch (error) {
     console.error('❌ Erreur globale:', error)
     
+    const errorMessage = error instanceof Error ? error.message : 'Erreur lors de la création de l\'utilisateur'
+    
     return new Response(
       JSON.stringify({
-        error: error.message || 'Erreur lors de la création de l\'utilisateur'
+        error: errorMessage
       }),
       {
         status: 500,
