@@ -1,13 +1,21 @@
+/**
+ * Edge Function: create-user
+ * Crée un utilisateur dans auth.users ET public.users de manière atomique
+ * Utilise service_role pour bypasser les RLS et éviter les conflits avec AuthContext
+ * Déployement: supabase functions deploy create-user --no-verify-jwt
+ */
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
 
+// En-têtes CORS pour permettre les appels depuis le frontend
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // Gestion des requêtes CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -15,8 +23,8 @@ serve(async (req) => {
   try {
     console.log('📝 Début de la fonction create-user')
     
-    // Créer un client Supabase avec la clé service_role (admin)
-    // pour créer le nouvel utilisateur
+    // Client Supabase avec privilèges admin (service_role)
+    // ⚠️ IMPORTANT: Bypass tous les RLS, ne jamais exposer cette clé au frontend
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -30,10 +38,10 @@ serve(async (req) => {
     
     console.log('✅ Client admin créé')
 
-    // Récupérer les données de la requête
+    // Extraction des données de la requête
     const { email, password, full_name, role_id } = await req.json()
 
-    // Validation des champs
+    // Validation des champs requis
     if (!email || !password || !full_name || !role_id) {
       return new Response(
         JSON.stringify({ error: 'Tous les champs sont requis' }),
@@ -44,7 +52,7 @@ serve(async (req) => {
       )
     }
 
-    // Validation email format
+    // Validation format email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       return new Response(
@@ -56,7 +64,7 @@ serve(async (req) => {
       )
     }
 
-    // Validation mot de passe
+    // Validation longueur mot de passe
     if (password.length < 6) {
       return new Response(
         JSON.stringify({ error: 'Le mot de passe doit contenir au moins 6 caractères' }),
@@ -69,11 +77,12 @@ serve(async (req) => {
 
     console.log('📝 Création de l\'utilisateur:', email)
 
-    // Créer l'utilisateur dans auth.users avec la clé admin (pas de limite d'emails)
+    // Création dans auth.users avec auth.admin.createUser()
+    // email_confirm: true pour confirmation automatique (pas de lien par email)
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
       password: password,
-      email_confirm: true, // Confirmer automatiquement l'email
+      email_confirm: true,
       user_metadata: {
         full_name: full_name
       }
@@ -90,7 +99,7 @@ serve(async (req) => {
 
     console.log('✅ Utilisateur créé dans Auth:', authData.user.id)
 
-    // Insérer dans la table public.users
+    // Insertion dans public.users avec le même ID pour maintenir la cohérence
     const { error: insertError } = await supabaseAdmin
       .from('users')
       .insert({
@@ -101,17 +110,16 @@ serve(async (req) => {
         is_active: true
       })
 
+    // Si l'insertion échoue, supprimer l'utilisateur Auth (rollback manuel)
     if (insertError) {
       console.error('❌ Erreur insertion users:', insertError)
-      
-      // Supprimer l'utilisateur Auth si l'insertion dans users échoue
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
-      
       throw insertError
     }
 
     console.log('✅ Utilisateur inséré dans la table users')
 
+    // Retour de la réponse de succès
     return new Response(
       JSON.stringify({
         success: true,
