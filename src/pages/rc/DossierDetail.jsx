@@ -228,12 +228,12 @@ export default function DossierDetail() {
             {/* Badge État */}
             <span className={`inline-block px-4 py-2 text-sm font-semibold rounded-lg ${
               dossier.etat === 'EN_COURS' ? 'bg-blue-100 text-blue-800' :
-              dossier.etat === 'EN_ATTENTE' ? 'bg-yellow-100 text-yellow-800' :
+              dossier.etat === 'EN_INSTANCE' ? 'bg-orange-100 text-orange-800' :
               dossier.etat === 'CLOTURE' ? 'bg-gray-100 text-gray-800' :
               dossier.etat === 'ANNULE' ? 'bg-red-100 text-red-800' :
               'bg-gray-100 text-gray-800'
             }`}>
-              {dossier.etat?.replace('_', ' ') || 'EN COURS'}
+              {dossier.etat?.replaceAll('_', ' ') || 'EN COURS'}
             </span>
           </div>
         </div>
@@ -378,13 +378,15 @@ export default function DossierDetail() {
           {/* Boutons d'action */}
           <div className="mt-6 pt-6 border-t border-gray-200">
             <div className="flex gap-4">
-              {/* Bouton Modifier - Toujours visible */}
-              <button
-                onClick={() => navigate(`/rc/dossiers/${id}/edit`)}
-                className="bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-700 transition flex items-center gap-2"
-              >
-                ✏️ Modifier le dossier
-              </button>
+              {/* Bouton Modifier - Visible uniquement si niveau = RELATION_CLIENT */}
+              {dossier.niveau === 'RELATION_CLIENT' && (
+                <button
+                  onClick={() => navigate(`/rc/dossiers`)}
+                  className="bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-700 transition flex items-center gap-2"
+                >
+                  ← Retour à la liste
+                </button>
+              )}
 
               {/* Bouton Transmettre - Visible uniquement si niveau = RELATION_CLIENT */}
               {dossier.niveau === 'RELATION_CLIENT' && (
