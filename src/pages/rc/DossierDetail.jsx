@@ -90,7 +90,7 @@ export default function DossierDetail() {
   const handleTransmitToPrestation = async () => {
     // Confirmation avant transmission
     const confirmTransmit = window.confirm(
-      `Êtes-vous sûr de vouloir transmettre le dossier #${id} au service Prestation ?\n\nCette action est irréversible.`
+      `Êtes-vous sûr de vouloir transmettre ce dossier au service Prestation ?\n\nCette action est irréversible.`
     )
 
     if (!confirmTransmit) return
@@ -212,7 +212,7 @@ export default function DossierDetail() {
               ← Retour à la liste
             </button>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold text-gray-800">Dossier #{dossier.id}</h1>
+              <h1 className="text-3xl font-bold text-gray-800">{dossier.souscripteur}</h1>
               {dossier.is_urgent && (
                 <span className="px-3 py-1 bg-red-100 text-red-800 text-sm font-semibold rounded-full flex items-center gap-1">
                   🚨 URGENT
@@ -351,13 +351,6 @@ export default function DossierDetail() {
                 </p>
               </div>
             )}
-
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">
-                ID du dossier
-              </h3>
-              <p className="text-gray-900 font-mono">#{dossier.id}</p>
-            </div>
 
             <div>
               <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">

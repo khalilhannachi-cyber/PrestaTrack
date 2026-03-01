@@ -377,7 +377,7 @@ export default function PrestationDashboard() {
 
     // Confirmation
     const confirmAction = window.confirm(
-      `Voulez-vous marquer les pièces du dossier #${dossier.id} comme "à traiter" ?\n\nCela créera des notifications pour les équipes Prestation et Finance.`
+      `Voulez-vous marquer les pièces du dossier "${dossier.souscripteur}" comme "à traiter" ?\n\nCela créera des notifications pour les équipes Prestation et Finance.`
     )
 
     if (!confirmAction) return
@@ -511,7 +511,7 @@ export default function PrestationDashboard() {
 
     // Confirmation
     const confirmAction = window.confirm(
-      `Voulez-vous transférer la quittance du dossier #${dossier.id} au service Finance ?\n\nLe dossier passera au niveau FINANCE.`
+      `Voulez-vous transférer la quittance du dossier "${dossier.souscripteur}" au service Finance ?\n\nLe dossier passera au niveau FINANCE.`
     )
 
     if (!confirmAction) return
@@ -1031,7 +1031,7 @@ export default function PrestationDashboard() {
                 {/* En-tête */}
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-bold text-gray-800">
-                    ✏️ Modifier Dossier #{editingDossier.id}
+                    ✏️ Modifier le dossier
                   </h2>
                   <button
                     onClick={closeEditModal}
