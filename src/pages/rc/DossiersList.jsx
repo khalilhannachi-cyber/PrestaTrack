@@ -194,9 +194,6 @@ export default function DossiersList() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                    ID
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                     Souscripteur
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
@@ -262,11 +259,6 @@ export default function DossiersList() {
 
                   return (
                     <tr key={dossier.id} className="hover:bg-gray-50 transition">
-                      {/* ID */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                        #{dossier.id}
-                      </td>
-                      
                       {/* Souscripteur */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-semibold text-gray-900">
