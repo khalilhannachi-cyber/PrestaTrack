@@ -1137,7 +1137,7 @@ export default function PrestationDashboard() {
                         </div>
                         <div className="ml-3">
                           <p className="text-sm text-yellow-700">
-                            <strong>Note :</strong> La modification entraînera automatiquement le passage de l'état du dossier à <strong>EN_INSTANCE</strong>.
+                            <strong>Note :</strong> Cochez "Document complet" pour activer les boutons <strong>Pièces à traiter</strong> et <strong>Transfert quittance</strong>.
                           </p>
                         </div>
                       </div>

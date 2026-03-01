@@ -322,14 +322,17 @@ export const AuthProvider = ({ children }) => {
     console.log('✅ [AuthContext] Connexion réussie')
     
     // Étape 2 : Récupération des informations utilisateur
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      console.log('👤 [AuthContext] Utilisateur connecté:', user.email)
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    if (authUser) {
+      console.log('👤 [AuthContext] Utilisateur connecté:', authUser.email)
       
       try {
         // Étape 3 : Vérification du rôle et du statut actif
-        await fetchUserRole(user.id)
+        await fetchUserRole(authUser.id)
         // Si fetchUserRole réussit, l'utilisateur est valide et actif
+        // ✅ Mise à jour immédiate du state user pour éviter les race conditions
+        setUser(authUser)
+        console.log('✅ [AuthContext] User state mis à jour dans signIn')
       } catch (roleError) {
         // Si l'utilisateur est inactif ou n'a pas de rôle, on déconnecte
         console.error('❌ [AuthContext] Erreur lors de la vérification:', roleError.message)

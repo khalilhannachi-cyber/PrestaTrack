@@ -104,11 +104,16 @@ export default function AgencesList() {
 
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-gray-600">Chargement...</div>
+      <AdminLayout>
+        <div className="p-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+              <p className="text-gray-600">Chargement des agences...</p>
+            </div>
+          </div>
         </div>
-      </div>
+      </AdminLayout>
     )
   }
 
