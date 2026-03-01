@@ -47,14 +47,38 @@ export const AuthProvider = ({ children }) => {
   // Effect Hook - Initialisation et écoute des changements d'auth
   // ═══════════════════════════════════════════════════════════════
   useEffect(() => {
-    // Vérification de la session au montage du composant
-    checkUser()
+    let mounted = true
+    let timeoutId = null
 
+    // Vérification de la session au montage du composant
+    const initAuth = async () => {
+      if (mounted) {
+        await checkUser()
+      }
+    }
+    
+    initAuth()
+
+    // Timeout de sécurité : après 10 secondes, on force loading à false
+    timeoutId = setTimeout(() => {
+      if (mounted) {
+        console.warn('⚠️ [AuthContext] Timeout de vérification atteint - Arrêt du chargement')
+        setLoading(false)
+      }
+    }, 10000)
+    
     // Écoute en temps réel des changements d'état d'authentification
-    // Se déclenche lors du login, logout, refresh token, etc.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return
+      
       // Log de débogage pour suivre les événements d'authentification
       console.log('🔔 [AuthContext] Auth state changed:', event)
+      
+      // Ignorer les événements de vérification initiale pour éviter les boucles
+      if (event === 'INITIAL_SESSION') {
+        console.log('⏭️ [AuthContext] INITIAL_SESSION ignoré (déjà géré par checkUser)')
+        return
+      }
       
       if (session?.user) {
         // ─────────────────────────────────────────────────────────
@@ -68,29 +92,43 @@ export const AuthProvider = ({ children }) => {
           setUser(session.user)
           console.log('✅ [AuthContext] Utilisateur autorisé')
         } catch (error) {
+          // Ignorer les AbortErrors
+          if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+            console.warn('⚠️ [AuthContext] AbortError ignoré')
+            return
+          }
+          
           // Si l'utilisateur est inactif, n'existe pas, ou n'a pas de rôle valide
           console.error('❌ [AuthContext] Utilisateur non autorisé:', error.message)
           console.warn('🚪 [AuthContext] Déconnexion automatique')
           
           // Déconnexion forcée pour des raisons de sécurité
-          await supabase.auth.signOut()
-          setUser(null)
-          setRole(null)
-          setIsActive(false)
+          if (mounted) {
+            await supabase.auth.signOut()
+            setUser(null)
+            setRole(null)
+            setIsActive(false)
+          }
         }
       } else {
         // ─────────────────────────────────────────────────────────
         // Cas 2 : Utilisateur déconnecté - Réinitialisation
         // ─────────────────────────────────────────────────────────
         console.log('🚪 [AuthContext] Utilisateur déconnecté')
-        setUser(null)
-        setRole(null)
-        setIsActive(true)
+        if (mounted) {
+          setUser(null)
+          setRole(null)
+          setIsActive(true)
+        }
       }
     })
 
     // Nettoyage : désabonnement lors du démontage du composant
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      if (timeoutId) clearTimeout(timeoutId)
+      subscription.unsubscribe()
+    }
   }, [])
 
   // ═══════════════════════════════════════════════════════════════
@@ -117,6 +155,14 @@ export const AuthProvider = ({ children }) => {
           setUser(session.user)
           console.log('✅ [AuthContext] Session valide, utilisateur autorisé')
         } catch (roleError) {
+          // Ignorer les AbortErrors
+          if (roleError.name === 'AbortError' || roleError.message?.includes('aborted')) {
+            console.warn('⚠️ [AuthContext] AbortError lors de checkUser - ignoré, on garde la session')
+            // On garde quand même l'utilisateur connecté en cas d'AbortError
+            setUser(session.user)
+            return
+          }
+          
           // L'utilisateur n'existe pas dans users, est inactif, ou n'a pas de rôle valide
           console.error('❌ [AuthContext] Utilisateur non valide:', roleError.message)
           console.warn('🚪 [AuthContext] Déconnexion automatique - Utilisateur non autorisé')
@@ -136,7 +182,7 @@ export const AuthProvider = ({ children }) => {
       }
       
       console.error('❌ [AuthContext] Erreur lors de la vérification:', error)
-      // En cas d'erreur, on déconnecte par sécurité
+      // En cas d'erreur grave, on déconnecte par sécurité SAUF pour AbortError
       await supabase.auth.signOut()
       setUser(null)
       setRole(null)
