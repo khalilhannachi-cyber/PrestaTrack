@@ -129,6 +129,12 @@ export const AuthProvider = ({ children }) => {
         }
       }
     } catch (error) {
+      // Ignorer les erreurs d'annulation (AbortError)
+      if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+        console.warn('⚠️ [AuthContext] Vérification annulée (AbortError) - ignorée')
+        return
+      }
+      
       console.error('❌ [AuthContext] Erreur lors de la vérification:', error)
       // En cas d'erreur, on déconnecte par sécurité
       await supabase.auth.signOut()
@@ -232,6 +238,12 @@ export const AuthProvider = ({ children }) => {
       
       return { roleName, isActive: userIsActive }
     } catch (error) {
+      // Ignorer les erreurs d'annulation (AbortError)
+      if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+        console.warn('⚠️ [AuthContext] Requête annulée (AbortError) - ignorée')
+        return { roleName: null, isActive: false }
+      }
+      
       console.error('❌ [AuthContext] Erreur lors de la récupération du rôle:', error)
       console.error('❌ [AuthContext] Détails:', error.message)
       setRole(null)
