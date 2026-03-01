@@ -134,15 +134,6 @@ export default function PrestationDashboard() {
       }
       
       console.log('✅ [PrestationDashboard] Dossiers chargés:', data?.length || 0, 'résultat(s)')
-      console.log('📦 [PrestationDashboard] Données:', data)
-      
-      // Debug: Vérifier les valeurs document_complet et quittance_signee
-      if (data && data.length > 0) {
-        data.forEach(d => {
-          const details = d.dossier_details_prestation?.[0]
-          console.log(`📋 Dossier #${d.id} - document_complet: ${details?.document_complet}, quittance_signee: ${details?.quittance_signee}`)
-        })
-      }
       
       setDossiers(data || [])
     } catch (err) {
@@ -675,15 +666,15 @@ export default function PrestationDashboard() {
    */
   const renderBooleanBadge = (value) => {
     if (value === null || value === undefined) {
-      return <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">N/A</span>
+      return <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-600">N/A</span>
     }
     
     return value ? (
-      <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 font-semibold">
+      <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
         ✓ Oui
       </span>
     ) : (
-      <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800 font-semibold">
+      <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
         ✗ Non
       </span>
     )
@@ -706,7 +697,7 @@ export default function PrestationDashboard() {
     const config = etatConfig[etat] || { bg: 'bg-gray-100', text: 'text-gray-800', label: etat || 'N/A' }
 
     return (
-      <span className={`px-3 py-1 text-xs rounded-full font-semibold ${config.bg} ${config.text}`}>
+      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${config.bg} ${config.text}`}>
         {config.label}
       </span>
     )
@@ -755,31 +746,96 @@ export default function PrestationDashboard() {
     <PrestationLayout>
       <div className="p-6">
         {/* En-tête */}
-        <div className="mb-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">📊 Dashboard Prestations</h1>
-              <p className="text-gray-600 mt-1">
-                Liste de tous les dossiers au niveau Prestation ({dossiers.length} au total)
-              </p>
-            </div>
-            <button
-              onClick={fetchPrestationDossiers}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
-            >
-              🔄 Actualiser
-            </button>
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800">📊 Dashboard Prestations</h1>
+            <p className="text-gray-600 mt-1">
+              Liste de tous les dossiers au niveau Prestation ({dossiers.length} au total)
+            </p>
           </div>
+          <button
+            onClick={fetchPrestationDossiers}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition flex items-center gap-2 font-semibold"
+          >
+            <span className="text-xl">🔄</span>
+            Actualiser
+          </button>
         </div>
+
+        {/* Statistiques rapides */}
+        {dossiers.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+            {/* Total */}
+            <div className="bg-white shadow rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 font-medium">Total</p>
+                  <p className="text-2xl font-bold text-gray-800">{dossiers.length}</p>
+                </div>
+                <div className="text-3xl">📋</div>
+              </div>
+            </div>
+
+            {/* En cours */}
+            <div className="bg-white shadow rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 font-medium">En cours</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {dossiers.filter(d => d.etat === 'EN_COURS').length}
+                  </p>
+                </div>
+                <div className="text-3xl">🔄</div>
+              </div>
+            </div>
+
+            {/* Documents complets */}
+            <div className="bg-white shadow rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 font-medium">Docs complets</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {dossiers.filter(d => d.dossier_details_prestation?.[0]?.document_complet === true).length}
+                  </p>
+                </div>
+                <div className="text-3xl">✅</div>
+              </div>
+            </div>
+
+            {/* En instance */}
+            <div className="bg-white shadow rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 font-medium">En instance</p>
+                  <p className="text-2xl font-bold text-orange-600">
+                    {dossiers.filter(d => d.etat === 'EN_INSTANCE').length}
+                  </p>
+                </div>
+                <div className="text-3xl">⏳</div>
+              </div>
+            </div>
+
+            {/* Quittances signées */}
+            <div className="bg-white shadow rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 font-medium">Quittances</p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {dossiers.filter(d => d.dossier_details_prestation?.[0]?.quittance_signee === true).length}
+                  </p>
+                </div>
+                <div className="text-3xl">📝</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Message si aucun dossier */}
         {dossiers.length === 0 ? (
           <div className="bg-white shadow-lg rounded-lg p-12 text-center">
-            <div className="text-gray-400 text-6xl mb-4">📂</div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Aucun dossier prestation</h2>
-            <p className="text-gray-600">
-              Aucun dossier n'est actuellement au niveau PRESTATION.
-            </p>
+            <div className="text-6xl mb-4">📂</div>
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">Aucun dossier prestation</h3>
+            <p className="text-gray-600">Aucun dossier n'est actuellement au niveau PRESTATION.</p>
           </div>
         ) : (
           /* Tableau des dossiers */
@@ -788,34 +844,31 @@ export default function PrestationDashboard() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ID
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                       Souscripteur
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                       N° Police
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                       Agence
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                       Date Réception
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                       Montant
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                       Doc. Complet
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                       Quittance Signée
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                       État
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
@@ -841,33 +894,51 @@ export default function PrestationDashboard() {
 
                     return (
                       <tr key={dossier.id} className="hover:bg-gray-50 transition">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          #{dossier.id}
+                        {/* Souscripteur */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-semibold text-gray-900">
+                            {dossier.souscripteur || 'N/A'}
+                          </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {dossier.souscripteur || 'N/A'}
+                        
+                        {/* Numéro de police */}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono">
+                          {dossier.police_number || '-'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
-                          {dossier.police_number || 'N/A'}
+                        
+                        {/* Agence */}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {agence.nom || '-'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {agence.nom || 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        
+                        {/* Date de réception */}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                           {formatDate(detailsRC.date_reception, dossier.created_at)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
-                          {formatMontant(detailsPrestation.montant)}
+                        
+                        {/* Montant */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-semibold text-gray-900">
+                            {formatMontant(detailsPrestation.montant)}
+                          </div>
                         </td>
+                        
+                        {/* Document complet */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           {renderBooleanBadge(detailsPrestation.document_complet)}
                         </td>
+                        
+                        {/* Quittance signée */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           {renderBooleanBadge(detailsPrestation.quittance_signee)}
                         </td>
+                        
+                        {/* État */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           {renderEtatBadge(dossier.etat)}
                         </td>
+                        
+                        {/* Actions */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <div className="flex gap-2">
                             <button
