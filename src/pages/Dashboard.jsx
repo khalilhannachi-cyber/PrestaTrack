@@ -20,6 +20,9 @@ export default function Dashboard() {
     } else if (role === 'RELATION_CLIENT') {
       console.log('🔀 [Dashboard] Redirection RC vers /rc/dossiers')
       navigate('/rc/dossiers', { replace: true })
+    } else if (role === 'PRESTATION') {
+      console.log('🔀 [Dashboard] Redirection Prestation vers /prestation/dashboard')
+      navigate('/prestation/dashboard', { replace: true })
     } else if (role === 'FINANCE') {
       console.log('🔀 [Dashboard] Redirection Finance vers /finance/dashboard')
       // navigate('/finance/dashboard', { replace: true })
@@ -44,6 +47,12 @@ export default function Dashboard() {
           title: 'Espace Relation Client',
           icon: '💼',
           description: 'Gérez vos dossiers clients.'
+        }
+      case 'PRESTATION':
+        return {
+          title: 'Espace Prestation',
+          icon: '📊',
+          description: 'Gérez les dossiers au niveau Prestation.'
         }
       case 'FINANCE':
         return {

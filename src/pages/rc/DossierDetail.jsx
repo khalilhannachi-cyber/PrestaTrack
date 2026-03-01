@@ -82,9 +82,10 @@ export default function DossierDetail() {
 
   /**
    * Transmet le dossier au service Prestation
-   * Processus en 2 étapes :
+   * Processus en 3 étapes :
    * 1. Met à jour le niveau du dossier à 'PRESTATION'
-   * 2. Ajoute une entrée dans l'historique des actions
+   * 2. Met à jour la date de réception dans dossier_details_rc
+   * 3. Ajoute une entrée dans l'historique des actions
    */
   const handleTransmitToPrestation = async () => {
     // Confirmation avant transmission
@@ -119,9 +120,27 @@ export default function DossierDetail() {
       console.log('✅ [DossierDetail] Niveau mis à jour à PRESTATION')
 
       // ─────────────────────────────────────────────────────────────
-      // ÉTAPE 2 : Ajout dans l'historique des actions
+      // ÉTAPE 2 : Mise à jour de la date de réception dans dossier_details_rc
       // ─────────────────────────────────────────────────────────────
-      console.log('📝 [DossierDetail] Étape 2 : Ajout à l\'historique')
+      console.log('📝 [DossierDetail] Étape 2 : Mise à jour de la date de réception')
+      const { error: dateReceptionError } = await supabase
+        .from('dossier_details_rc')
+        .update({
+          date_reception: new Date().toISOString().split('T')[0] // Format YYYY-MM-DD
+        })
+        .eq('dossier_id', id)
+
+      if (dateReceptionError) {
+        console.error('❌ [DossierDetail] Erreur mise à jour date de réception:', dateReceptionError)
+        throw new Error(`Erreur lors de la mise à jour de la date de réception: ${dateReceptionError.message}`)
+      }
+
+      console.log('✅ [DossierDetail] Date de réception mise à jour')
+
+      // ─────────────────────────────────────────────────────────────
+      // ÉTAPE 3 : Ajout dans l'historique des actions
+      // ─────────────────────────────────────────────────────────────
+      console.log('📝 [DossierDetail] Étape 3 : Ajout à l\'historique')
       const { error: historiqueError } = await supabase
         .from('historique_actions')
         .insert([
