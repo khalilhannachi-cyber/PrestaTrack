@@ -15,6 +15,8 @@ import DossierDetail from './pages/rc/DossierDetail'
 import UsersList from './pages/admin/UsersList'
 import NewUser from './pages/admin/NewUser'
 import AgencesList from './pages/admin/AgencesList'
+// Pages Prestation
+import PrestationDashboard from './pages/prestation/PrestationDashboard'
 
 /**
  * Composant principal de l'application PrestaTrack
@@ -111,6 +113,20 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
                 <AgencesList />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* ═══════════════════════════════════════════════════════════════ */}
+          {/* Routes Prestation - Réservées au rôle PRESTATION              */}
+          {/* ═══════════════════════════════════════════════════════════════ */}
+          
+          {/* Dashboard des prestations */}
+          <Route
+            path="/prestation/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['PRESTATION']}>
+                <PrestationDashboard />
               </ProtectedRoute>
             }
           />
