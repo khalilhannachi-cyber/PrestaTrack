@@ -357,9 +357,6 @@ export default function PrestationDashboard() {
 
       alert('✅ Dossier modifié avec succès !')
 
-      // Rechargement en arrière-plan pour synchroniser avec la BDD
-      fetchPrestationDossiers(true)
-
     } catch (err) {
       console.error('❌ [PrestationDashboard] Erreur lors de la modification:', err)
       alert(`❌ Erreur: ${err.message}`)
