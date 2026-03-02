@@ -231,49 +231,16 @@ export default function PrestationDashboard() {
       // ÉTAPE 1 : Mise à jour de dossier_details_prestation
       // Vérifier si la ligne existe, sinon la créer
       // ─────────────────────────────────────────────────────────────
-      console.log('📝 [PrestationDashboard] Étape 1 : Vérification et mise à jour dossier_details_prestation')
+      console.log('📝 [PrestationDashboard] Étape 1 : Upsert dossier_details_prestation')
       
-      // Vérifier si une ligne existe déjà
-      const { data: existingDetails, error: checkError } = await supabase
+      const { error: prestationError } = await supabase
         .from('dossier_details_prestation')
-        .select('dossier_id')
-        .eq('dossier_id', editingDossier.id)
-        .maybeSingle()
-
-      if (checkError) {
-        console.error('❌ [PrestationDashboard] Erreur vérification prestation:', checkError)
-        throw new Error(`Erreur lors de la vérification des détails: ${checkError.message}`)
-      }
-
-      let prestationError
-      
-      if (existingDetails) {
-        // Ligne existe : UPDATE
-        console.log('📝 [PrestationDashboard] Ligne existe, mise à jour...')
-        const { error } = await supabase
-          .from('dossier_details_prestation')
-          .update({
-            montant: parseFloat(formData.montant) || null,
-            document_complet: formData.document_complet,
-            quittance_signee: formData.quittance_signee
-          })
-          .eq('dossier_id', editingDossier.id)
-        
-        prestationError = error
-      } else {
-        // Ligne n'existe pas : INSERT
-        console.log('📝 [PrestationDashboard] Ligne n\'existe pas, création...')
-        const { error } = await supabase
-          .from('dossier_details_prestation')
-          .insert({
-            dossier_id: editingDossier.id,
-            montant: parseFloat(formData.montant) || null,
-            document_complet: formData.document_complet,
-            quittance_signee: formData.quittance_signee
-          })
-        
-        prestationError = error
-      }
+        .upsert({
+          dossier_id: editingDossier.id,
+          montant: formData.montant !== '' ? parseFloat(formData.montant) : null,
+          document_complet: formData.document_complet,
+          quittance_signee: formData.quittance_signee
+        }, { onConflict: 'dossier_id' })
 
       if (prestationError) {
         console.error('❌ [PrestationDashboard] Erreur mise à jour prestation:', prestationError)
@@ -356,6 +323,9 @@ export default function PrestationDashboard() {
       }))
 
       alert('✅ Dossier modifié avec succès !')
+
+      // Refetch silencieux pour confirmer les données BDD
+      fetchPrestationDossiers(true)
 
     } catch (err) {
       console.error('❌ [PrestationDashboard] Erreur lors de la modification:', err)
