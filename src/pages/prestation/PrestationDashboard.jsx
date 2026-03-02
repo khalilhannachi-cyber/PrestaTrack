@@ -860,8 +860,8 @@ export default function PrestationDashboard() {
 
                     // Désactiver tous les boutons si niveau != PRESTATION
                     const canEdit = isNiveauPrestation && !isSaving
-                    // Désactiver "Pièces à traiter" si le document n'est pas complet OU niveau != PRESTATION OU déjà traité (EN_INSTANCE)
-                    const canMarkPieces = isNiveauPrestation && isDocumentComplet && dossier.etat !== 'EN_INSTANCE' && !isSaving
+                    // "Pièces à traiter" actif uniquement si doc complet et niveau PRESTATION
+                    const canMarkPieces = isNiveauPrestation && isDocumentComplet && !isSaving
                     // Désactiver "Transfert quittance" si le document n'est pas complet OU quittance_signee = false OU niveau != PRESTATION
                     const canTransferQuittance = isNiveauPrestation && isDocumentComplet && isQuittanceSignee && !isSaving
 
