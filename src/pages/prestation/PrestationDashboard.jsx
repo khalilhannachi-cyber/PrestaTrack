@@ -98,11 +98,9 @@ export default function PrestationDashboard() {
     try {
       if (!silent) setLoading(true)
       setError(null)
-      
-      console.log('🔍 [PrestationDashboard] Chargement des dossiers PRESTATION')
-      
-      // Requête SELECT avec JOINs multiples et filtre sur niveau
-      const { data, error: fetchError } = await supabase
+
+      // Requête 1 : dossiers + agence + détails RC
+      const { data: dossiers, error: fetchError } = await supabase
         .from('dossiers')
         .select(`
           id,
@@ -111,31 +109,38 @@ export default function PrestationDashboard() {
           niveau,
           etat,
           created_at,
-          agences (
-            id,
-            nom
-          ),
-          dossier_details_rc (
-            date_reception,
-            motif_instance
-          ),
-          dossier_details_prestation (
-            montant,
-            document_complet,
-            quittance_signee
-          )
+          agences ( id, nom ),
+          dossier_details_rc ( date_reception, motif_instance )
         `)
-        .eq('niveau', 'PRESTATION') // Filtre : uniquement les dossiers au niveau PRESTATION
+        .eq('niveau', 'PRESTATION')
         .order('created_at', { ascending: false })
 
-      if (fetchError) {
-        console.error('❌ [PrestationDashboard] Erreur Supabase:', fetchError)
-        throw fetchError
+      if (fetchError) throw fetchError
+
+      if (!dossiers || dossiers.length === 0) {
+        setDossiers([])
+        return
       }
-      
-      console.log('✅ [PrestationDashboard] Dossiers chargés:', data?.length || 0, 'résultat(s)')
-      
-      setDossiers(data || [])
+
+      // Requête 2 : détails prestation en requête séparée (contourne RLS JOIN)
+      const dossierIds = dossiers.map(d => d.id)
+      const { data: prestationDetails } = await supabase
+        .from('dossier_details_prestation')
+        .select('dossier_id, montant, document_complet, quittance_signee')
+        .in('dossier_id', dossierIds)
+
+      // Fusion manuelle
+      const prestationMap = {}
+      if (prestationDetails) {
+        prestationDetails.forEach(p => { prestationMap[p.dossier_id] = p })
+      }
+
+      const merged = dossiers.map(d => ({
+        ...d,
+        dossier_details_prestation: prestationMap[d.id] ? [prestationMap[d.id]] : []
+      }))
+
+      setDossiers(merged)
     } catch (err) {
       console.error('❌ [PrestationDashboard] Erreur lors du chargement:', err)
       setError(err.message || 'Erreur inconnue lors du chargement des dossiers')
