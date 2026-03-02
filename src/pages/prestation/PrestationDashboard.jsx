@@ -231,20 +231,37 @@ export default function PrestationDashboard() {
       // ÉTAPE 1 : Mise à jour de dossier_details_prestation
       // Vérifier si la ligne existe, sinon la créer
       // ─────────────────────────────────────────────────────────────
-      console.log('📝 [PrestationDashboard] Étape 1 : Upsert dossier_details_prestation')
-      
-      const { error: prestationError } = await supabase
-        .from('dossier_details_prestation')
-        .upsert({
-          dossier_id: editingDossier.id,
-          montant: formData.montant !== '' ? parseFloat(formData.montant) : null,
-          document_complet: formData.document_complet,
-          quittance_signee: formData.quittance_signee
-        }, { onConflict: 'dossier_id' })
+      console.log('📝 [PrestationDashboard] Étape 1 : Sauvegarde dossier_details_prestation')
 
-      if (prestationError) {
-        console.error('❌ [PrestationDashboard] Erreur mise à jour prestation:', prestationError)
-        throw new Error(`Erreur lors de la mise à jour des détails prestation: ${prestationError.message}`)
+      const prestationPayload = {
+        montant: formData.montant !== '' ? parseFloat(formData.montant) : null,
+        document_complet: formData.document_complet,
+        quittance_signee: formData.quittance_signee
+      }
+
+      // Tenter UPDATE d'abord
+      const { data: updatedRows, error: updateError } = await supabase
+        .from('dossier_details_prestation')
+        .update(prestationPayload)
+        .eq('dossier_id', editingDossier.id)
+        .select('dossier_id')
+
+      if (updateError) {
+        console.error('❌ [PrestationDashboard] Erreur UPDATE prestation:', updateError)
+        throw new Error(`Erreur mise à jour détails prestation: ${updateError.message}`)
+      }
+
+      // Si aucune ligne mise à jour → INSERT
+      if (!updatedRows || updatedRows.length === 0) {
+        console.log('📝 [PrestationDashboard] Aucune ligne existante, INSERT...')
+        const { error: insertError } = await supabase
+          .from('dossier_details_prestation')
+          .insert({ dossier_id: editingDossier.id, ...prestationPayload })
+
+        if (insertError) {
+          console.error('❌ [PrestationDashboard] Erreur INSERT prestation:', insertError)
+          throw new Error(`Erreur insertion détails prestation: ${insertError.message}`)
+        }
       }
 
       console.log('✅ [PrestationDashboard] Détails prestation mis à jour')
@@ -323,9 +340,6 @@ export default function PrestationDashboard() {
       }))
 
       alert('✅ Dossier modifié avec succès !')
-
-      // Refetch silencieux pour confirmer les données BDD
-      fetchPrestationDossiers(true)
 
     } catch (err) {
       console.error('❌ [PrestationDashboard] Erreur lors de la modification:', err)
