@@ -37,44 +37,31 @@ export default function DossierDetail() {
    */
   const fetchDossier = async () => {
     try {
-      // Requête SELECT avec filtre sur l'ID et JOINs
+      // Requête 1 : dossier + agence
       const { data, error } = await supabase
         .from('dossiers')
         .select(`
           *,
-          agences (
-            id,
-            nom,
-            adresse
-          ),
-          dossier_details_rc (
-            telephone,
-            demande_initiale,
-            motif_instance
-          )
+          agences ( id, nom, adresse )
         `)
         .eq('id', id)
-        .single() // Attend un seul résultat
+        .single()
 
-      if (error) {
-        console.error('❌ [DossierDetail] Erreur Supabase:', error)
-        console.error('❌ [DossierDetail] Code:', error.code)
-        console.error('❌ [DossierDetail] Message:', error.message)
-        console.error('❌ [DossierDetail] Details:', error.details)
-        throw error
-      }
-      
-      if (!data) {
-        console.error('❌ [DossierDetail] Aucune donnée retournée')
-        throw new Error('Le dossier n\'existe pas')
-      }
-      
-      console.log('✅ [DossierDetail] Dossier chargé:', data)
-      setDossier(data)
+      if (error) throw error
+      if (!data) throw new Error('Le dossier n\'existe pas')
+
+      // Requête 2 : détails RC séparée (contourne RLS JOIN)
+      const { data: rcData } = await supabase
+        .from('dossier_details_rc')
+        .select('telephone, demande_initiale, motif_instance, date_reception')
+        .eq('dossier_id', id)
+        .maybeSingle()
+
+      setDossier({ ...data, dossier_details_rc: rcData ? [rcData] : [] })
     } catch (error) {
       console.error('❌ [DossierDetail] Erreur lors du chargement du dossier:', error)
       alert(`Dossier introuvable: ${error.message || 'Erreur inconnue'}`)
-      navigate('/rc/dossiers') // Redirection en cas d'erreur
+      navigate('/rc/dossiers')
     } finally {
       setLoading(false)
     }
@@ -288,35 +275,29 @@ export default function DossierDetail() {
         {/* ═══════════════════════════════════════════════════════════════ */}
         {/* Section : Détails de la Demande (RC)                            */}
         {/* ═══════════════════════════════════════════════════════════════ */}
-        {detailsRC && (
-          <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
-              📄 Détails de la Demande
-            </h2>
-
-            <div className="space-y-4">
-              {detailsRC.demande_initiale && (
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">
-                    Demande Initiale
-                  </h3>
-                  <p className="text-gray-900 leading-relaxed bg-gray-50 p-4 rounded-lg">
-                    {detailsRC.demande_initiale}
-                  </p>
-                </div>
-              )}
-
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">
-                  Motif d'Instance
-                </h3>
-                <p className="text-gray-900 leading-relaxed bg-gray-50 p-4 rounded-lg">
-                  {detailsRC.motif_instance || 'Non renseigné'}
-                </p>
-              </div>
+        <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
+          <h2 className="text-xl font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
+            📄 Détails de la Demande
+          </h2>
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">
+                Demande Initiale
+              </h3>
+              <p className="text-gray-900 leading-relaxed bg-gray-50 p-4 rounded-lg">
+                {detailsRC?.demande_initiale || <span className="text-gray-400 italic">Non renseignée</span>}
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">
+                Motif d'Instance
+              </h3>
+              <p className="text-gray-900 leading-relaxed bg-gray-50 p-4 rounded-lg">
+                {detailsRC?.motif_instance || <span className="text-gray-400 italic">Non renseigné</span>}
+              </p>
             </div>
           </div>
-        )}
+        </div>
 
         {/* ═══════════════════════════════════════════════════════════════ */}
         {/* Section : Informations Système                                  */}
