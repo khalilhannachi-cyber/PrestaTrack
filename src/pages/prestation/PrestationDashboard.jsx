@@ -239,29 +239,24 @@ export default function PrestationDashboard() {
         quittance_signee: formData.quittance_signee
       }
 
-      // Tenter UPDATE d'abord
-      const { data: updatedRows, error: updateError } = await supabase
+      // Assurer l'existence de la ligne (INSERT si pas encore créée)
+      // L'erreur 23505 (duplicate key) est normale et ignorée — ça veut juste dire que la ligne existe déjà
+      const { error: ensureError } = await supabase
+        .from('dossier_details_prestation')
+        .insert({ dossier_id: editingDossier.id, montant: null, document_complet: false, quittance_signee: false })
+      if (ensureError && ensureError.code !== '23505') {
+        console.warn('⚠️ [PrestationDashboard] INSERT ensure:', ensureError.message)
+      }
+
+      // UPDATE systématique — la ligne existe forcément maintenant
+      const { error: updateError } = await supabase
         .from('dossier_details_prestation')
         .update(prestationPayload)
         .eq('dossier_id', editingDossier.id)
-        .select('dossier_id')
 
       if (updateError) {
         console.error('❌ [PrestationDashboard] Erreur UPDATE prestation:', updateError)
         throw new Error(`Erreur mise à jour détails prestation: ${updateError.message}`)
-      }
-
-      // Si aucune ligne mise à jour → INSERT
-      if (!updatedRows || updatedRows.length === 0) {
-        console.log('📝 [PrestationDashboard] Aucune ligne existante, INSERT...')
-        const { error: insertError } = await supabase
-          .from('dossier_details_prestation')
-          .insert({ dossier_id: editingDossier.id, ...prestationPayload })
-
-        if (insertError) {
-          console.error('❌ [PrestationDashboard] Erreur INSERT prestation:', insertError)
-          throw new Error(`Erreur insertion détails prestation: ${insertError.message}`)
-        }
       }
 
       console.log('✅ [PrestationDashboard] Détails prestation mis à jour')
