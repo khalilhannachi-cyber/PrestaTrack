@@ -94,9 +94,9 @@ export default function PrestationDashboard() {
    * Avec JOINs sur les tables dossier_details_prestation, dossier_details_rc et agences
    * Triés par date de création (plus récents en premier)
    */
-  const fetchPrestationDossiers = async () => {
+  const fetchPrestationDossiers = async (silent = false) => {
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
       setError(null)
       
       console.log('🔍 [PrestationDashboard] Chargement des dossiers PRESTATION')
@@ -140,7 +140,7 @@ export default function PrestationDashboard() {
       console.error('❌ [PrestationDashboard] Erreur lors du chargement:', err)
       setError(err.message || 'Erreur inconnue lors du chargement des dossiers')
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
@@ -334,14 +334,31 @@ export default function PrestationDashboard() {
       )
 
       // ─────────────────────────────────────────────────────────────
-      // SUCCÈS : Fermeture modal et rechargement des données
+      // SUCCÈS : Fermeture modal + mise à jour immédiate de l'état local
       // ─────────────────────────────────────────────────────────────
       closeEditModal()
-      
-      // Rechargement immédiat des données
-      await fetchPrestationDossiers()
-      
+
+      // Mise à jour directe du dossier dans la liste (pas de spinner)
+      setDossiers(prev => prev.map(d => {
+        if (d.id !== editingDossier.id) return d
+        return {
+          ...d,
+          dossier_details_prestation: [{
+            montant: parseFloat(formData.montant) || null,
+            document_complet: formData.document_complet,
+            quittance_signee: formData.quittance_signee
+          }],
+          dossier_details_rc: [{
+            ...(d.dossier_details_rc?.[0] || {}),
+            motif_instance: formData.motif_instance
+          }]
+        }
+      }))
+
       alert('✅ Dossier modifié avec succès !')
+
+      // Rechargement en arrière-plan pour synchroniser avec la BDD
+      fetchPrestationDossiers(true)
 
     } catch (err) {
       console.error('❌ [PrestationDashboard] Erreur lors de la modification:', err)
