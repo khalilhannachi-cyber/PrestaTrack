@@ -484,10 +484,12 @@ export default function PrestationDashboard() {
       // ─────────────────────────────────────────────────────────────
       // SUCCÈS : Rechargement des données
       // ─────────────────────────────────────────────────────────────
+      // Mise à jour locale immédiate de l'état
+      setDossiers(prev => prev.map(d =>
+        d.id === dossier.id ? { ...d, etat: 'EN_INSTANCE' } : d
+      ))
+
       alert('✅ Pièces marquées pour traitement ! Les équipes ont été notifiées.')
-      
-      // Rechargement des données
-      await fetchPrestationDossiers()
 
     } catch (err) {
       console.error('❌ [PrestationDashboard] Erreur lors du traitement des pièces:', err)
@@ -523,7 +525,7 @@ export default function PrestationDashboard() {
 
     // Confirmation
     const confirmAction = window.confirm(
-      `Voulez-vous transférer la quittance du dossier "${dossier.souscripteur}" au service Finance ?\n\nLe dossier passera au niveau FINANCE.`
+      `Voulez-vous notifier le service Finance du transfert de la quittance signée du dossier "${dossier.souscripteur}" ?\n\nLe dossier restera en instance chez Prestation jusqu'à validation par Finance.`
     )
 
     if (!confirmAction) return
@@ -533,34 +535,18 @@ export default function PrestationDashboard() {
     try {
       console.log('🚀 [PrestationDashboard] Début du transfert de quittance pour dossier #', dossier.id)
       
-      const oldNiveau = dossier.niveau
       const currentEtat = dossier.etat
 
       // ─────────────────────────────────────────────────────────────
-      // ÉTAPE 1 : Mise à jour du niveau du dossier à FINANCE
+      // NOTE : Le niveau reste PRESTATION — la validation Finance
+      // (depuis l'interface Finance) est ce qui fera passer le
+      // dossier au niveau FINANCE (étapes 8-9 du workflow)
       // ─────────────────────────────────────────────────────────────
-      console.log('📝 [PrestationDashboard] Étape 1 : Mise à jour du niveau à FINANCE')
-      
-      const { error: dossierError } = await supabase
-        .from('dossiers')
-        .update({
-          niveau: 'FINANCE',
-          updated_at: new Date().toISOString()
-          // On garde le même état (ne pas modifier etat)
-        })
-        .eq('id', dossier.id)
-
-      if (dossierError) {
-        console.error('❌ [PrestationDashboard] Erreur mise à jour niveau:', dossierError)
-        throw new Error(`Erreur lors de la mise à jour du niveau: ${dossierError.message}`)
-      }
-
-      console.log('✅ [PrestationDashboard] Niveau mis à jour à FINANCE')
 
       // ─────────────────────────────────────────────────────────────
-      // ÉTAPE 2 : Récupération des utilisateurs FINANCE
+      // ÉTAPE 1 : Récupération des utilisateurs FINANCE
       // ─────────────────────────────────────────────────────────────
-      console.log('📝 [PrestationDashboard] Étape 2 : Récupération des utilisateurs FINANCE')
+      console.log('📝 [PrestationDashboard] Étape 1 : Récupération des utilisateurs FINANCE à notifier')
       
       const { data: usersToNotify, error: usersError } = await supabase
         .from('users')
@@ -605,23 +591,17 @@ export default function PrestationDashboard() {
       }
 
       // ─────────────────────────────────────────────────────────────
-      // ÉTAPE 3 : Ajout dans l'historique des actions
+      // ÉTAPE 2 : Ajout dans l'historique des actions
       // ─────────────────────────────────────────────────────────────
       await logAction(
         dossier.id,
         'QUITTANCE_TRANSFEREE',
         currentEtat,
         currentEtat,
-        `Quittance transférée au service Finance - Niveau: ${oldNiveau} → FINANCE`
+        `Quittance signée transférée physiquement au service Finance - en attente de validation`
       )
 
-      // ─────────────────────────────────────────────────────────────
-      // SUCCÈS : Rechargement des données
-      // ─────────────────────────────────────────────────────────────
-      alert('✅ Quittance transférée au service Finance ! L\'équipe a été notifiée.')
-      
-      // Rechargement des données
-      await fetchPrestationDossiers()
+      alert('✅ Quittance transférée au service Finance ! L\'équipe a été notifiée. Le dossier reste en instance jusqu\'à validation par Finance.')
 
     } catch (err) {
       console.error('❌ [PrestationDashboard] Erreur lors du transfert de quittance:', err)
@@ -896,8 +876,8 @@ export default function PrestationDashboard() {
 
                     // Désactiver tous les boutons si niveau != PRESTATION
                     const canEdit = isNiveauPrestation && !isSaving
-                    // Désactiver "Pièces à traiter" si le document n'est pas complet OU niveau != PRESTATION
-                    const canMarkPieces = isNiveauPrestation && isDocumentComplet && !isSaving
+                    // Désactiver "Pièces à traiter" si le document n'est pas complet OU niveau != PRESTATION OU déjà traité (EN_INSTANCE)
+                    const canMarkPieces = isNiveauPrestation && isDocumentComplet && dossier.etat !== 'EN_INSTANCE' && !isSaving
                     // Désactiver "Transfert quittance" si le document n'est pas complet OU quittance_signee = false OU niveau != PRESTATION
                     const canTransferQuittance = isNiveauPrestation && isDocumentComplet && isQuittanceSignee && !isSaving
 
