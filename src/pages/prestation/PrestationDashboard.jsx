@@ -420,11 +420,11 @@ export default function PrestationDashboard() {
           id,
           email,
           full_name,
-          roles (
+          roles!inner (
             name
           )
         `)
-        .or('roles.name.eq.PRESTATION,roles.name.eq.FINANCE')
+        .in('roles.name', ['PRESTATION', 'FINANCE'])
 
       if (usersError) {
         console.error('❌ [PrestationDashboard] Erreur récupération utilisateurs:', usersError)
@@ -438,7 +438,7 @@ export default function PrestationDashboard() {
             user_id: userToNotify.id,
             dossier_id: dossier.id,
             type: 'PIECE_A_TRAITER',
-            message: `Pièces à traiter pour le dossier #${dossier.id} (${dossier.souscripteur})`,
+            message: `Pièces à traiter pour le dossier de ${dossier.souscripteur}`,
             is_read: false,
             created_at: new Date().toISOString()
           }))
@@ -472,10 +472,8 @@ export default function PrestationDashboard() {
       // ─────────────────────────────────────────────────────────────
       alert('✅ Pièces marquées pour traitement ! Les équipes ont été notifiées.')
       
-      // Attendre un court instant avant de recharger pour s'assurer que la DB est à jour
-      setTimeout(async () => {
-        await fetchPrestationDossiers()
-      }, 300)
+      // Rechargement des données
+      await fetchPrestationDossiers()
 
     } catch (err) {
       console.error('❌ [PrestationDashboard] Erreur lors du traitement des pièces:', err)
@@ -556,7 +554,7 @@ export default function PrestationDashboard() {
           id,
           email,
           full_name,
-          roles (
+          roles!inner (
             name
           )
         `)
@@ -574,7 +572,7 @@ export default function PrestationDashboard() {
             user_id: userToNotify.id,
             dossier_id: dossier.id,
             type: 'QUITTANCE_TRANSFEREE',
-            message: `Quittance transférée pour le dossier #${dossier.id} (${dossier.souscripteur})`,
+            message: `Quittance transférée pour le dossier de ${dossier.souscripteur}`,
             is_read: false,
             created_at: new Date().toISOString()
           }))
@@ -608,10 +606,8 @@ export default function PrestationDashboard() {
       // ─────────────────────────────────────────────────────────────
       alert('✅ Quittance transférée au service Finance ! L\'équipe a été notifiée.')
       
-      // Attendre un court instant avant de recharger pour s'assurer que la DB est à jour
-      setTimeout(async () => {
-        await fetchPrestationDossiers()
-      }, 300)
+      // Rechargement des données
+      await fetchPrestationDossiers()
 
     } catch (err) {
       console.error('❌ [PrestationDashboard] Erreur lors du transfert de quittance:', err)
@@ -688,7 +684,6 @@ export default function PrestationDashboard() {
   const renderEtatBadge = (etat) => {
     const etatConfig = {
       'EN_COURS': { bg: 'bg-blue-100', text: 'text-blue-800', label: 'En cours' },
-      'EN_ATTENTE': { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'En attente' },
       'EN_INSTANCE': { bg: 'bg-orange-100', text: 'text-orange-800', label: 'En instance' },
       'CLOTURE': { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Clôturé' },
       'ANNULE': { bg: 'bg-red-100', text: 'text-red-800', label: 'Annulé' }
