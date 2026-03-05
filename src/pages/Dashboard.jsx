@@ -27,7 +27,7 @@ export default function Dashboard() {
       navigate('/prestation/dashboard', { replace: true })
     } else if (role === 'FINANCE') {
       console.log('🔀 [Dashboard] Redirection Finance vers /finance/dashboard')
-      // navigate('/finance/dashboard', { replace: true })
+      navigate('/finance/dashboard', { replace: true })
     }
   }, [role, navigate]) // Redirige dès que le rôle est disponible
 

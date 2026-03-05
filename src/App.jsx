@@ -17,6 +17,8 @@ import NewUser from './pages/admin/NewUser'
 import AgencesList from './pages/admin/AgencesList'
 // Pages Prestation
 import PrestationDashboard from './pages/prestation/PrestationDashboard'
+// Pages Finance
+import FinanceDashboard from './pages/Finance/FinanceDashboard'
 
 /**
  * Composant principal de l'application PrestaTrack
@@ -127,6 +129,20 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['PRESTATION']}>
                 <PrestationDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* ═══════════════════════════════════════════════════════════════ */}
+          {/* Routes Finance - Réservées au rôle FINANCE                     */}
+          {/* ═══════════════════════════════════════════════════════════════ */}
+
+          {/* Dashboard Finance */}
+          <Route
+            path="/finance/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['FINANCE']}>
+                <FinanceDashboard />
               </ProtectedRoute>
             }
           />
