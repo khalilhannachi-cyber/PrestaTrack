@@ -82,7 +82,7 @@ export default function FinanceDashboard() {
             motif_instance
           )
         `)
-        .eq('niveau', 'FINANCE')
+        .or('niveau.eq.FINANCE,etat.eq.EN_INSTANCE')
         .order('created_at', { ascending: false })
 
       if (fetchError) throw fetchError
@@ -211,6 +211,20 @@ export default function FinanceDashboard() {
       if (upsertError) throw upsertError
 
       console.log('✅ [FinanceDashboard] dossier_details_finance mis à jour')
+
+      // ── Étape 1b : Si conformité validée, changer niveau à FINANCE ──
+      if (conformiteForm.conformite_validee) {
+        const { error: niveauErr } = await supabase
+          .from('dossiers')
+          .update({ niveau: 'FINANCE', updated_at: new Date().toISOString() })
+          .eq('id', conformiteDossier.id)
+
+        if (niveauErr) {
+          console.warn('⚠️ [FinanceDashboard] Erreur MAJ niveau:', niveauErr.message)
+        } else {
+          console.log('✅ [FinanceDashboard] Niveau mis à jour à FINANCE')
+        }
+      }
 
       // ── Étape 2 : Historique des actions ──────────────────────────
       if (user?.id) {
