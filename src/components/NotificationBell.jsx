@@ -1,24 +1,41 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../contexts/AuthContext'
+import { checkStaleDossiers } from '../lib/checkStaleDossiers'
 
 /**
  * Composant cloche de notifications
  * Affiche un badge avec le nombre de notifications non lues
  * et un dropdown avec la liste des messages.
+ *
+ * Intègre aussi la vérification des dossiers bloqués (> 3 jours)
+ * qui est déclenchée au montage puis toutes les 5 minutes.
  */
 export default function NotificationBell() {
-  const { user } = useAuth()
+  const { user, role } = useAuth()
   const [notifications, setNotifications] = useState([])
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
+  // Polling notifications (30 s)
   useEffect(() => {
     if (user) fetchNotifications()
-    const interval = setInterval(() => { if (user) fetchNotifications() }, 30000) // polling 30s
+    const interval = setInterval(() => { if (user) fetchNotifications() }, 30000)
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
+
+  // Vérification des dossiers bloqués (au montage + toutes les 5 min)
+  useEffect(() => {
+    if (user && role) {
+      checkStaleDossiers(role).then(() => fetchNotifications())
+    }
+    const staleInterval = setInterval(() => {
+      if (user && role) checkStaleDossiers(role).then(() => fetchNotifications())
+    }, 5 * 60 * 1000) // 5 minutes
+    return () => clearInterval(staleInterval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, role])
 
   // Fermer le dropdown au clic extérieur
   useEffect(() => {
