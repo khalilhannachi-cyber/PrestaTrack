@@ -2,6 +2,7 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 // Hook pour accéder au contexte d'authentification
 import { useAuth } from '../contexts/AuthContext'
+import NotificationBell from './NotificationBell'
 
 /**
  * Layout (mise en page) pour les pages Relation Client
@@ -49,10 +50,13 @@ export default function RCLayout({ children }) {
       <aside className="w-64 bg-white shadow-lg fixed h-full">
         {/* Header de la sidebar */}
         <div className="p-6 border-b border-gray-200">
-          <h1 className="text-xl font-bold text-gray-800">
-            📋 Relation Client
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">PrestaTrack</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold text-gray-800">📋 Relation Client</h1>
+              <p className="text-sm text-gray-500 mt-1">PrestaTrack</p>
+            </div>
+            <NotificationBell />
+          </div>
         </div>
 
         {/* Navigation principale */}

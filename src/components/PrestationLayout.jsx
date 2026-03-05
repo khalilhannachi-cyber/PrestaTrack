@@ -2,6 +2,7 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 // Hook pour accéder au contexte d'authentification
 import { useAuth } from '../contexts/AuthContext'
+import NotificationBell from './NotificationBell'
 
 /**
  * Layout (mise en page) pour les pages Prestation
@@ -75,6 +76,8 @@ export default function PrestationLayout({ children }) {
 
               {/* Séparateur visuel */}
               <div className="h-6 w-px bg-gray-300"></div>
+
+              <NotificationBell />
 
               {/* Affichage de l'email de l'utilisateur connecté */}
               <div className="text-sm text-gray-600">

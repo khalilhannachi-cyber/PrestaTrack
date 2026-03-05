@@ -10,25 +10,24 @@ import { useAuth } from '../../contexts/AuthContext'
 import RCLayout from '../../components/RCLayout'
 
 /**
- * Page de création d'un nouveau dossier
- * Formulaire complet avec tous les champs requis et gestion multi-tables
- * 
- * Processus de création :
- * 1. Insère dans la table 'dossiers'
- * 2. Récupère l'ID du dossier créé
- * 3. Insère les détails dans 'dossier_details_rc'
- * 4. Ajoute une entrée dans 'historique_actions'
- * 
- * @returns {React.ReactNode} La page de formulaire dans le RCLayout
+ * Page de création d'un nouveau dossier – Conformité Cahier des Charges
+ *
+ * Champs : Souscripteur* | Date réception bureau d'ordre (défaut aujourd'hui, modifiable) |
+ *          Date envoi RC (auto aujourd'hui, lecture seule) | Téléphone | Agence* |
+ *          N° Police* | Motif instance* | Demande initiale (select : R TOTAL / R Partiel / R ECHU / Transfert Contrat / AUTRE)
+ *
+ * Boutons : « Enregistrer » (sauvegarde, niveau = RELATION_CLIENT)
+ *           « Envoyer » (sauvegarde + envoi Prestation, niveau = PRESTATION)
  */
 export default function NewDossier() {
   const navigate = useNavigate()
-  const { user } = useAuth() // Récupération de l'utilisateur connecté
-  const [loading, setLoading] = useState(false) // Indicateur de chargement pendant la création
-  const [agences, setAgences] = useState([]) // Liste des agences pour le select
-  const [loadingAgences, setLoadingAgences] = useState(true) // Chargement des agences
-  
-  // État du formulaire avec tous les champs requis
+  const { user } = useAuth()
+  const [loading, setLoading] = useState(false)
+  const [agences, setAgences] = useState([])
+  const [loadingAgences, setLoadingAgences] = useState(true)
+
+  const today = new Date().toISOString().split('T')[0]
+
   const [formData, setFormData] = useState({
     souscripteur: '',
     police_number: '',
@@ -36,28 +35,20 @@ export default function NewDossier() {
     telephone: '',
     demande_initiale: '',
     motif_instance: '',
-    is_urgent: false
+    date_reception: today // Date réception bureau d'ordre – défaut aujourd'hui, modifiable
   })
 
-  // ═══════════════════════════════════════════════════════════════
-  // Chargement des agences au montage du composant
-  // ═══════════════════════════════════════════════════════════════
   useEffect(() => {
     fetchAgences()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // fetchAgences est stable, pas besoin de l'inclure
+  }, [])
 
-  /**
-   * Récupère la liste des agences depuis Supabase
-   * Pour alimenter le select d'agences
-   */
   const fetchAgences = async () => {
     try {
       const { data, error } = await supabase
         .from('agences')
-        .select('id, nom')
+        .select('id, nom, code')
         .order('nom', { ascending: true })
-
       if (error) throw error
       setAgences(data || [])
     } catch (error) {
@@ -69,223 +60,143 @@ export default function NewDossier() {
   }
 
   /**
-   * Gère la soumission du formulaire
-   * Processus en 3 étapes avec gestion d'erreurs et rollback
+   * Crée le dossier avec le niveau spécifié
+   * @param {'RELATION_CLIENT'|'PRESTATION'} niveau
    */
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
+  const handleSave = async (niveau) => {
+    // Validation manuelle des champs requis
+    if (!formData.souscripteur || !formData.police_number || !formData.agence_id || !formData.motif_instance) {
+      alert('❌ Veuillez remplir tous les champs obligatoires (*).')
+      return
+    }
 
+    setLoading(true)
     try {
-      console.log('🚀 [NewDossier] Début de la création du dossier')
-      
-      // ─────────────────────────────────────────────────────────────
       // ÉTAPE 1 : Insertion dans la table 'dossiers'
-      // ─────────────────────────────────────────────────────────────
-      console.log('📝 [NewDossier] Étape 1 : Insertion dans dossiers')
       const { data: dossierData, error: dossierError } = await supabase
         .from('dossiers')
-        .insert([
-          {
-            souscripteur: formData.souscripteur,
-            police_number: formData.police_number,
-            agence_id: formData.agence_id || null,
-            niveau: 'RELATION_CLIENT', // Niveau initial par défaut
-            etat: 'EN_COURS', // État initial du dossier
-            is_urgent: formData.is_urgent, // Urgence du dossier
-            created_by: user.id // Associe le dossier à l'utilisateur connecté
-          }
-        ])
-        .select() // Important : récupère l'ID du dossier créé
+        .insert([{
+          souscripteur: formData.souscripteur,
+          police_number: formData.police_number,
+          agence_id: formData.agence_id || null,
+          niveau,
+          etat: 'EN_COURS',
+          created_by: user.id
+        }])
+        .select()
 
-      if (dossierError) {
-        console.error('❌ [NewDossier] Erreur insertion dossier:', dossierError)
-        throw new Error(`Erreur lors de la création du dossier: ${dossierError.message}`)
-      }
-
-      // Vérification que l'insertion a retourné des données
-      if (!dossierData || dossierData.length === 0) {
-        throw new Error('Aucune donnée retournée après la création du dossier')
-      }
+      if (dossierError) throw new Error(`Erreur création dossier: ${dossierError.message}`)
+      if (!dossierData || dossierData.length === 0) throw new Error('Aucune donnée retournée')
 
       const dossierId = dossierData[0].id
-      console.log('✅ [NewDossier] Dossier créé avec ID:', dossierId)
 
-      // ─────────────────────────────────────────────────────────────
       // ÉTAPE 2 : Insertion dans 'dossier_details_rc'
-      // ─────────────────────────────────────────────────────────────
-      console.log('📝 [NewDossier] Étape 2 : Insertion dans dossier_details_rc')
       const { error: detailsError } = await supabase
         .from('dossier_details_rc')
-        .insert([
-          {
-            dossier_id: dossierId,
-            telephone: formData.telephone,
-            demande_initiale: formData.demande_initiale,
-            motif_instance: formData.motif_instance
-          }
-        ])
+        .insert([{
+          dossier_id: dossierId,
+          telephone: formData.telephone,
+          demande_initiale: formData.demande_initiale,
+          motif_instance: formData.motif_instance,
+          date_reception: formData.date_reception
+        }])
 
       if (detailsError) {
-        console.error('❌ [NewDossier] Erreur insertion détails RC:', detailsError)
-        // Rollback : supprimer le dossier créé
         await supabase.from('dossiers').delete().eq('id', dossierId)
-        throw new Error(`Erreur lors de l'ajout des détails: ${detailsError.message}`)
+        throw new Error(`Erreur ajout détails: ${detailsError.message}`)
       }
 
-      console.log('✅ [NewDossier] Détails RC insérés')
+      // ÉTAPE 3 : Historique
+      const actionLabel = niveau === 'PRESTATION' ? 'Création et envoi au service Prestation' : 'Création du dossier'
+      await supabase.from('historique_actions').insert([{
+        dossier_id: dossierId,
+        user_id: user.id,
+        action: actionLabel,
+        description: `Dossier créé pour ${formData.souscripteur}`,
+        old_status: null,
+        new_status: niveau
+      }])
 
-      // ─────────────────────────────────────────────────────────────
-      // ÉTAPE 3 : Ajout d'une entrée dans 'historique_actions'
-      // ─────────────────────────────────────────────────────────────
-      console.log('📝 [NewDossier] Étape 3 : Insertion dans historique_actions')
-      const { error: historiqueError } = await supabase
-        .from('historique_actions')
-        .insert([
-          {
-            dossier_id: dossierId,
-            user_id: user.id,
-            action: 'Création du dossier',
-            description: `Dossier créé pour ${formData.souscripteur}${formData.is_urgent ? ' (URGENT)' : ''}`
-          }
-        ])
-
-      if (historiqueError) {
-        console.error('⚠️ [NewDossier] Erreur insertion historique:', historiqueError)
-        // On ne fait pas de rollback ici car c'est moins critique
-        // Le dossier et les détails sont déjà créés
-      } else {
-        console.log('✅ [NewDossier] Historique ajouté')
-      }
-
-      // ─────────────────────────────────────────────────────────────
-      // SUCCÈS : Affichage message et redirection
-      // ─────────────────────────────────────────────────────────────
-      console.log('🎉 [NewDossier] Dossier créé avec succès')
-      alert('✅ Dossier créé avec succès!')
-      navigate(`/rc/dossiers/${dossierId}`) // Redirection vers le détail du dossier
-      
+      const msg = niveau === 'PRESTATION'
+        ? '✅ Dossier créé et envoyé au service Prestation !'
+        : '✅ Dossier enregistré avec succès !'
+      alert(msg)
+      navigate('/rc/dossiers')
     } catch (error) {
-      console.error('❌ [NewDossier] Erreur globale:', error)
+      console.error('❌ [NewDossier]', error)
       alert(`❌ ${error.message || 'Erreur lors de la création du dossier'}`)
     } finally {
       setLoading(false)
     }
   }
 
-  /**
-   * Met à jour l'état du formulaire lors des changements
-   * Gère les champs texte, select et checkbox
-   */
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target
-    
-    setFormData({
-      ...formData,
-      [name]: type === 'checkbox' ? checked : value
-    })
+    const { name, value } = e.target
+    setFormData({ ...formData, [name]: value })
   }
 
   return (
     <RCLayout>
       <div className="p-6 max-w-3xl mx-auto">
-        {/* ═══════════════════════════════════════════════════════════════ */}
-        {/* En-tête avec bouton retour                                      */}
-        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* En-tête */}
         <div className="mb-6">
-          <button
-            onClick={() => navigate('/rc/dossiers')}
-            className="text-blue-600 hover:text-blue-800 mb-4 flex items-center gap-2"
-          >
+          <button onClick={() => navigate('/rc/dossiers')} className="text-blue-600 hover:text-blue-800 mb-4 flex items-center gap-2">
             ← Retour à la liste
           </button>
           <h1 className="text-3xl font-bold text-gray-800">📋 Nouveau Dossier</h1>
           <p className="text-gray-600 mt-2">Remplissez les informations du dossier</p>
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════════ */}
-        {/* Formulaire de création                                          */}
-        {/* ═══════════════════════════════════════════════════════════════ */}
-        <form onSubmit={handleSubmit} className="bg-white shadow-lg rounded-lg p-8 space-y-6">
-          
+        {/* Formulaire */}
+        <div className="bg-white shadow-lg rounded-lg p-8 space-y-6">
+
           {/* Section : Informations du souscripteur */}
           <div className="border-b border-gray-200 pb-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">👤 Informations du Souscripteur</h2>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Champ : Souscripteur */}
+              {/* Souscripteur */}
               <div>
                 <label htmlFor="souscripteur" className="block text-sm font-medium text-gray-700 mb-2">
                   Nom du Souscripteur <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  id="souscripteur"
-                  name="souscripteur"
-                  value={formData.souscripteur}
-                  onChange={handleChange}
-                  required
+                <input type="text" id="souscripteur" name="souscripteur" value={formData.souscripteur} onChange={handleChange} required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Ex: Jean Dupont"
-                />
+                  placeholder="Ex: Jean Dupont" />
               </div>
 
-              {/* Champ : Numéro de police */}
+              {/* N° Police */}
               <div>
                 <label htmlFor="police_number" className="block text-sm font-medium text-gray-700 mb-2">
                   Numéro de Police <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  id="police_number"
-                  name="police_number"
-                  value={formData.police_number}
-                  onChange={handleChange}
-                  required
+                <input type="text" id="police_number" name="police_number" value={formData.police_number} onChange={handleChange} required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Ex: POL-2024-12345"
-                />
+                  placeholder="Ex: POL-2024-12345" />
               </div>
 
-              {/* Champ : Téléphone */}
+              {/* Téléphone */}
               <div>
                 <label htmlFor="telephone" className="block text-sm font-medium text-gray-700 mb-2">
-                  Téléphone <span className="text-red-500">*</span>
+                  Téléphone
                 </label>
-                <input
-                  type="tel"
-                  id="telephone"
-                  name="telephone"
-                  value={formData.telephone}
-                  onChange={handleChange}
-                  required
+                <input type="tel" id="telephone" name="telephone" value={formData.telephone} onChange={handleChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Ex: +33 6 12 34 56 78"
-                />
+                  placeholder="Ex: +212 6 12 34 56 78" />
               </div>
 
-              {/* Champ : Agence (Select) */}
+              {/* Agence (obligatoire) */}
               <div>
                 <label htmlFor="agence_id" className="block text-sm font-medium text-gray-700 mb-2">
-                  Agence
+                  Agence <span className="text-red-500">*</span>
                 </label>
                 {loadingAgences ? (
-                  <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
-                    Chargement des agences...
-                  </div>
+                  <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">Chargement des agences...</div>
                 ) : (
-                  <select
-                    id="agence_id"
-                    name="agence_id"
-                    value={formData.agence_id}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
+                  <select id="agence_id" name="agence_id" value={formData.agence_id} onChange={handleChange} required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     <option value="">-- Sélectionner une agence --</option>
-                    {agences.map((agence) => (
-                      <option key={agence.id} value={agence.id}>
-                        {agence.nom}
-                      </option>
+                    {agences.map((a) => (
+                      <option key={a.id} value={a.id}>{a.code ? `${a.code} - ` : ''}{a.nom}</option>
                     ))}
                   </select>
                 )}
@@ -293,105 +204,92 @@ export default function NewDossier() {
             </div>
           </div>
 
+          {/* Section : Dates */}
+          <div className="border-b border-gray-200 pb-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">📅 Dates</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Date réception bureau d'ordre (modifiable, défaut = aujourd'hui) */}
+              <div>
+                <label htmlFor="date_reception" className="block text-sm font-medium text-gray-700 mb-2">
+                  Date de réception bureau d'ordre
+                </label>
+                <input type="date" id="date_reception" name="date_reception" value={formData.date_reception} onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+              </div>
+
+              {/* Date envoi RC (auto = aujourd'hui, lecture seule) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date envoi RC
+                </label>
+                <input type="date" value={today} readOnly disabled
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed" />
+                <p className="mt-1 text-xs text-gray-400">Renseignée automatiquement (aujourd'hui)</p>
+              </div>
+            </div>
+          </div>
+
           {/* Section : Détails de la demande */}
           <div className="border-b border-gray-200 pb-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">📄 Détails de la Demande</h2>
-            
-            {/* Champ : Demande initiale */}
+
+            {/* Demande initiale – select conforme au cahier des charges */}
             <div className="mb-6">
               <label htmlFor="demande_initiale" className="block text-sm font-medium text-gray-700 mb-2">
                 Demande Initiale
               </label>
-              <textarea
-                id="demande_initiale"
-                name="demande_initiale"
-                value={formData.demande_initiale}
-                onChange={handleChange}
-                rows={4}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Décrivez la demande initiale du client..."
-              />
+              <select id="demande_initiale" name="demande_initiale" value={formData.demande_initiale} onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="">-- Sélectionner --</option>
+                <option value="R TOTAL">R TOTAL</option>
+                <option value="R Partiel">R Partiel</option>
+                <option value="R ECHU">R ECHU</option>
+                <option value="Transfert Contrat">Transfert Contrat</option>
+                <option value="AUTRE">AUTRE</option>
+              </select>
             </div>
 
-            {/* Champ : Motif d'instance (OBLIGATOIRE) */}
+            {/* Motif d'instance (obligatoire) */}
             <div>
               <label htmlFor="motif_instance" className="block text-sm font-medium text-gray-700 mb-2">
                 Motif d'Instance <span className="text-red-500">*</span>
               </label>
-              <textarea
-                id="motif_instance"
-                name="motif_instance"
-                value={formData.motif_instance}
-                onChange={handleChange}
-                required
-                rows={3}
+              <textarea id="motif_instance" name="motif_instance" value={formData.motif_instance} onChange={handleChange} required rows={3}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Motif de l'instance (obligatoire)..."
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Ce champ est obligatoire et décrit la raison de la création du dossier
-              </p>
+                placeholder="Motif de l'instance (obligatoire)..." />
+              <p className="mt-1 text-xs text-gray-500">Ce champ est obligatoire et décrit la raison de la création du dossier</p>
             </div>
           </div>
 
-          {/* Section : Options */}
-          <div className="pb-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">⚙️ Options</h2>
-            
-            {/* Checkbox : Dossier urgent */}
-            <div className="flex items-start">
-              <div className="flex items-center h-5">
-                <input
-                  type="checkbox"
-                  id="is_urgent"
-                  name="is_urgent"
-                  checked={formData.is_urgent}
-                  onChange={handleChange}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-              </div>
-              <div className="ml-3">
-                <label htmlFor="is_urgent" className="font-medium text-gray-700 flex items-center gap-2">
-                  🚨 Marquer comme urgent
-                </label>
-                <p className="text-sm text-gray-500">
-                  Cochez cette case si le dossier nécessite un traitement prioritaire
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Boutons d'action */}
-          <div className="flex gap-4 pt-6 border-t border-gray-200">
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
-            >
+          {/* Boutons d'action – Enregistrer / Envoyer / Annuler */}
+          <div className="flex flex-wrap gap-4 pt-6 border-t border-gray-200">
+            {/* Enregistrer : sauvegarde seulement (niveau = RC) */}
+            <button type="button" disabled={loading} onClick={() => handleSave('RELATION_CLIENT')}
+              className="flex-1 min-w-[160px] bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2">
               {loading ? (
-                <>
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                  </svg>
-                  Création en cours...
-                </>
+                <><svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg> Enregistrement...</>
               ) : (
-                <>
-                  ✅ Créer le Dossier
-                </>
+                <>💾 Enregistrer</>
               )}
             </button>
-            <button
-              type="button"
-              onClick={() => navigate('/rc/dossiers')}
-              disabled={loading}
-              className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 disabled:opacity-50 transition"
-            >
+
+            {/* Envoyer : sauvegarde + envoi Prestation */}
+            <button type="button" disabled={loading} onClick={() => handleSave('PRESTATION')}
+              className="flex-1 min-w-[160px] bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2">
+              {loading ? (
+                <><svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg> Envoi en cours...</>
+              ) : (
+                <>📤 Envoyer</>
+              )}
+            </button>
+
+            {/* Annuler */}
+            <button type="button" onClick={() => navigate('/rc/dossiers')} disabled={loading}
+              className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 disabled:opacity-50 transition">
               Annuler
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </RCLayout>
   )
