@@ -187,8 +187,8 @@ export default function DossierDetail() {
         <div className="p-6">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-              <p className="text-gray-600">Chargement des détails du dossier...</p>
+              <div className="inline-block animate-spin rounded-full h-10 w-10 border-2 border-comar-navy border-t-transparent mb-4"></div>
+              <p className="text-sm text-gray-500">Chargement des détails du dossier...</p>
             </div>
           </div>
         </div>
@@ -209,19 +209,20 @@ export default function DossierDetail() {
         {/* En-tête */}
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <button onClick={() => navigate('/rc/dossiers')} className="text-blue-600 hover:text-blue-800 mb-4 flex items-center gap-2">
-              ← Retour à la liste
+            <button onClick={() => navigate('/rc/dossiers')} className="text-comar-navy/60 hover:text-comar-navy mb-4 flex items-center gap-1.5 text-sm font-medium transition-colors cursor-pointer">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
+              Retour à la liste
             </button>
-            <h1 className="text-3xl font-bold text-gray-800">{dossier.souscripteur}</h1>
+            <h1 className="text-2xl font-bold text-comar-navy">{dossier.souscripteur}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <span className="inline-block px-4 py-2 text-sm font-semibold rounded-lg bg-blue-100 text-blue-800">
+            <span className="inline-block px-3 py-1.5 text-xs font-semibold rounded-lg bg-comar-navy-50 text-comar-navy">
               {niveauLabel[dossier.niveau] || dossier.niveau}
             </span>
-            <span className={`inline-block px-4 py-2 text-sm font-semibold rounded-lg ${
-              dossier.etat === 'EN_COURS' ? 'bg-blue-100 text-blue-800' :
-              dossier.etat === 'EN_INSTANCE' ? 'bg-orange-100 text-orange-800' :
-              dossier.etat === 'CLOTURE' ? 'bg-gray-100 text-gray-800' : 'bg-gray-100 text-gray-800'
+            <span className={`inline-block px-3 py-1.5 text-xs font-semibold rounded-lg ${
+              dossier.etat === 'EN_COURS' ? 'bg-sky-50 text-sky-700' :
+              dossier.etat === 'EN_INSTANCE' ? 'bg-amber-50 text-amber-700' :
+              dossier.etat === 'CLOTURE' ? 'bg-gray-100 text-gray-600' : 'bg-gray-100 text-gray-600'
             }`}>
               {etatLabel[dossier.etat] || dossier.etat}
             </span>
@@ -232,63 +233,68 @@ export default function DossierDetail() {
         {!editing ? (
           <>
             {/* Informations Souscripteur */}
-            <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">👤 Informations du Souscripteur</h2>
+            <div className="bg-white rounded-xl border border-comar-neutral-border p-6 mb-6">
+              <h2 className="text-base font-bold text-comar-navy mb-4 border-b border-comar-neutral-border pb-2 flex items-center gap-2">
+                <svg className="w-5 h-5 text-comar-navy/50" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
+                Informations du Souscripteur
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Souscripteur</h3>
-                  <p className="text-lg font-semibold text-gray-900">{dossier.souscripteur || 'N/A'}</p>
+                  <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Souscripteur</h3>
+                  <p className="text-sm font-semibold text-comar-navy">{dossier.souscripteur || 'N/A'}</p>
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Numéro de Police</h3>
-                  <p className="text-lg font-semibold text-gray-900">{dossier.police_number || 'N/A'}</p>
+                  <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Numéro de Police</h3>
+                  <p className="text-sm font-semibold text-comar-navy">{dossier.police_number || 'N/A'}</p>
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Téléphone</h3>
-                  <p className="text-lg font-semibold text-gray-900">{detailsRC?.telephone || 'N/A'}</p>
+                  <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Téléphone</h3>
+                  <p className="text-sm font-semibold text-comar-navy">{detailsRC?.telephone || 'N/A'}</p>
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Agence</h3>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {dossier.agences ? `${dossier.agences.code ? dossier.agences.code + ' - ' : ''}${dossier.agences.nom}` : 'Non assignée'}
-                  </p>
+                  <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Agence</h3>
+                  <p className="text-sm font-semibold text-comar-navy">{dossier.agences ? `${dossier.agences.code ? dossier.agences.code + ' - ' : ''}${dossier.agences.nom}` : 'Non assignée'}</p>
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Date de réception</h3>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {detailsRC?.date_reception ? new Date(detailsRC.date_reception).toLocaleDateString('fr-FR') : 'N/A'}
-                  </p>
+                  <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Date de réception</h3>
+                  <p className="text-sm font-semibold text-comar-navy">{detailsRC?.date_reception ? new Date(detailsRC.date_reception).toLocaleDateString('fr-FR') : 'N/A'}</p>
                 </div>
               </div>
             </div>
 
             {/* Détails de la Demande */}
-            <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">📄 Détails de la Demande</h2>
+            <div className="bg-white rounded-xl border border-comar-neutral-border p-6 mb-6">
+              <h2 className="text-base font-bold text-comar-navy mb-4 border-b border-comar-neutral-border pb-2 flex items-center gap-2">
+                <svg className="w-5 h-5 text-comar-navy/50" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+                Détails de la Demande
+              </h2>
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Demande Initiale</h3>
-                  <p className="text-gray-900 leading-relaxed bg-gray-50 p-4 rounded-lg">{detailsRC?.demande_initiale || <span className="text-gray-400 italic">Non renseignée</span>}</p>
+                  <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Demande Initiale</h3>
+                  <p className="text-sm text-comar-navy bg-comar-neutral-bg p-3 rounded-xl">{detailsRC?.demande_initiale || <span className="text-gray-400 italic">Non renseignée</span>}</p>
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Motif d'Instance</h3>
-                  <p className="text-gray-900 leading-relaxed bg-gray-50 p-4 rounded-lg">{detailsRC?.motif_instance || <span className="text-gray-400 italic">Non renseigné</span>}</p>
+                  <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Motif d'Instance</h3>
+                  <p className="text-sm text-comar-navy bg-comar-neutral-bg p-3 rounded-xl">{detailsRC?.motif_instance || <span className="text-gray-400 italic">Non renseigné</span>}</p>
                 </div>
               </div>
             </div>
 
             {/* Infos système */}
-            <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">ℹ️ Informations Système</h2>
+            <div className="bg-white rounded-xl border border-comar-neutral-border p-6 mb-6">
+              <h2 className="text-base font-bold text-comar-navy mb-4 border-b border-comar-neutral-border pb-2 flex items-center gap-2">
+                <svg className="w-5 h-5 text-comar-navy/50" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
+                Informations Système
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Date de création</h3>
-                  <p className="text-gray-900">{new Date(dossier.created_at).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })}</p>
+                  <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Date de création</h3>
+                  <p className="text-sm text-comar-navy">{new Date(dossier.created_at).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })}</p>
                 </div>
                 {dossier.updated_at && (
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Dernière modification</h3>
-                    <p className="text-gray-900">{new Date(dossier.updated_at).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })}</p>
+                    <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Dernière modification</h3>
+                    <p className="text-sm text-comar-navy">{new Date(dossier.updated_at).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })}</p>
                   </div>
                 )}
               </div>
@@ -296,28 +302,31 @@ export default function DossierDetail() {
           </>
         ) : (
           /* ══════ Mode édition ══════ */
-          <div className="bg-white shadow-lg rounded-lg p-8 mb-6 space-y-6">
-            <h2 className="text-xl font-bold text-gray-800 border-b border-gray-200 pb-2">✏️ Modifier le dossier</h2>
+          <div className="bg-white rounded-xl border border-comar-neutral-border p-8 mb-6 space-y-6">
+            <h2 className="text-base font-bold text-comar-navy border-b border-comar-neutral-border pb-2 flex items-center gap-2">
+              <svg className="w-5 h-5 text-comar-navy/50" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" /></svg>
+              Modifier le dossier
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Souscripteur <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-medium text-comar-navy mb-1.5">Souscripteur <span className="text-comar-red">*</span></label>
                 <input type="text" name="souscripteur" value={editForm.souscripteur} onChange={handleEditChange} required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="w-full px-4 py-2.5 border border-comar-neutral-border rounded-xl focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">N° Police <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-medium text-comar-navy mb-1.5">N° Police <span className="text-comar-red">*</span></label>
                 <input type="text" name="police_number" value={editForm.police_number} onChange={handleEditChange} required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="w-full px-4 py-2.5 border border-comar-neutral-border rounded-xl focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
+                <label className="block text-sm font-medium text-comar-navy mb-1.5">Téléphone</label>
                 <input type="tel" name="telephone" value={editForm.telephone} onChange={handleEditChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="w-full px-4 py-2.5 border border-comar-neutral-border rounded-xl focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Agence <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-medium text-comar-navy mb-1.5">Agence <span className="text-comar-red">*</span></label>
                 <select name="agence_id" value={editForm.agence_id} onChange={handleEditChange} required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  className="w-full px-4 py-2.5 border border-comar-neutral-border rounded-xl focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all">
                   <option value="">-- Sélectionner --</option>
                   {agences.map(a => (
                     <option key={a.id} value={a.id}>{a.code ? `${a.code} - ` : ''}{a.nom}</option>
@@ -325,35 +334,35 @@ export default function DossierDetail() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date de réception</label>
+                <label className="block text-sm font-medium text-comar-navy mb-1.5">Date de réception</label>
                 <input type="date" name="date_reception" value={editForm.date_reception} onChange={handleEditChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="w-full px-4 py-2.5 border border-comar-neutral-border rounded-xl focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Demande Initiale</label>
+                <label className="block text-sm font-medium text-comar-navy mb-1.5">Demande Initiale</label>
                 <select name="demande_initiale" value={editForm.demande_initiale} onChange={handleEditChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  className="w-full px-4 py-2.5 border border-comar-neutral-border rounded-xl focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all">
                   <option value="">-- Sélectionner --</option>
-                  <option value="R TOTAL">R TOTAL</option>
-                  <option value="R Partiel">R Partiel</option>
-                  <option value="R ECHU">R ECHU</option>
+                  <option value="Rachat Total">Rachat Total</option>
+                  <option value="Rachat Partiel">Rachat Partiel</option>
+                  <option value="Rachat Échu">Rachat Échu</option>
                   <option value="Transfert Contrat">Transfert Contrat</option>
-                  <option value="AUTRE">AUTRE</option>
+                  <option value="Autre">Autre</option>
                 </select>
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Motif d'Instance <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-medium text-comar-navy mb-1.5">Motif d'Instance <span className="text-comar-red">*</span></label>
               <textarea name="motif_instance" value={editForm.motif_instance} onChange={handleEditChange} required rows={3}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full px-4 py-2.5 border border-comar-neutral-border rounded-xl focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all" />
             </div>
-            <div className="flex gap-4 pt-4 border-t border-gray-200">
+            <div className="flex gap-3 pt-4 border-t border-comar-neutral-border">
               <button onClick={handleSave} disabled={saving}
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 transition flex items-center gap-2">
-                {saving ? 'Enregistrement...' : '💾 Enregistrer'}
+                className="bg-comar-navy text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-comar-navy-light disabled:opacity-50 transition-all duration-200 flex items-center gap-2 text-sm shadow-sm hover:shadow-md cursor-pointer">
+                {saving ? 'Enregistrement...' : (<><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" /></svg> Enregistrer</>)}
               </button>
               <button type="button" onClick={() => { setEditing(false); fetchDossier() }}
-                className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition">
+                className="px-5 py-2.5 bg-white text-gray-500 border border-comar-neutral-border rounded-xl font-semibold hover:bg-comar-neutral-bg transition-all duration-200 text-sm cursor-pointer">
                 Annuler
               </button>
             </div>
@@ -361,28 +370,30 @@ export default function DossierDetail() {
         )}
 
         {/* ══════ Barre d'actions ══════ */}
-        <div className="bg-white shadow-lg rounded-lg p-6">
-          <div className="flex flex-wrap gap-4">
+        <div className="bg-white rounded-xl border border-comar-neutral-border p-6">
+          <div className="flex flex-wrap gap-3">
             {isRC && !editing && (
               <>
                 <button onClick={() => setEditing(true)}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition flex items-center gap-2">
-                  ✏️ Modifier
+                  className="bg-comar-navy text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-comar-navy-light transition-all duration-200 flex items-center gap-2 text-sm shadow-sm hover:shadow-md cursor-pointer">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" /></svg>
+                  Modifier
                 </button>
                 <button onClick={handleTransmitToPrestation} disabled={transmitting}
-                  className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50 transition flex items-center gap-2">
-                  {transmitting ? 'Envoi...' : '📤 Envoyer à Prestation'}
+                  className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-all duration-200 flex items-center gap-2 text-sm shadow-sm hover:shadow-md cursor-pointer">
+                  {transmitting ? 'Envoi...' : (<><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg> Envoyer à Prestation</>)}
                 </button>
                 <button onClick={handleDelete}
-                  className="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition flex items-center gap-2">
-                  🗑️ Supprimer
+                  className="bg-comar-red text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-comar-red-light transition-all duration-200 flex items-center gap-2 text-sm cursor-pointer">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                  Supprimer
                 </button>
               </>
             )}
             {!isRC && (
-              <div className="flex items-center gap-2 text-green-700 bg-green-50 px-6 py-3 rounded-lg border border-green-200">
-                <span className="text-xl">✅</span>
-                <span className="font-semibold">Dossier transmis au service {niveauLabel[dossier.niveau] || dossier.niveau}</span>
+              <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 px-5 py-2.5 rounded-xl border border-emerald-200">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <span className="font-semibold text-sm">Dossier transmis au service {niveauLabel[dossier.niveau] || dossier.niveau}</span>
               </div>
             )}
           </div>

@@ -365,16 +365,16 @@ Cette action clôturera définitivement le dossier.`
   // ─────────────────────────────────────────────────────────────────
 
   /**
-   * Formate un montant en devise locale (MAD)
+   * Formate un montant en devise locale (TND)
    * @param {number|null|undefined} montant
    * @returns {string}
    */
   const formatMontant = (montant) => {
     if (montant === null || montant === undefined || montant === '') return '-'
-    return new Intl.NumberFormat('fr-MA', {
+    return new Intl.NumberFormat('fr-TN', {
       style: 'currency',
-      currency: 'MAD',
-      minimumFractionDigits: 2,
+      currency: 'TND',
+      minimumFractionDigits: 3,
     }).format(Number(montant))
   }
 
@@ -388,7 +388,7 @@ Cette action clôturera définitivement le dossier.`
   const BoolBadge = ({ value, labelTrue = 'Oui', labelFalse = 'Non' }) => {
     if (value === true) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">
           ✅ {labelTrue}
         </span>
       )
@@ -407,13 +407,13 @@ Cette action clôturera définitivement le dossier.`
    */
   const EtatBadge = ({ etat }) => {
     const config = {
-      EN_COURS:    { bg: 'bg-blue-100',   text: 'text-blue-800',   label: '🔄 En cours' },
-      EN_INSTANCE: { bg: 'bg-orange-100', text: 'text-orange-800', label: '⏳ En instance' },
-      VALIDE:      { bg: 'bg-green-100',  text: 'text-green-800',  label: '✅ Validé' },
-      REJETE:      { bg: 'bg-red-100',    text: 'text-red-800',    label: '❌ Rejeté' },
-      CLOTURE:     { bg: 'bg-gray-100',   text: 'text-gray-700',   label: '🔒 Clôturé' },
+      EN_COURS:    { bg: 'bg-comar-navy-50',   text: 'text-comar-navy',   label: 'En cours' },
+      EN_INSTANCE: { bg: 'bg-amber-50', text: 'text-amber-700', label: 'En instance' },
+      VALIDE:      { bg: 'bg-emerald-50',  text: 'text-emerald-700',  label: 'Validé' },
+      REJETE:      { bg: 'bg-red-100',    text: 'text-red-800',    label: 'Rejeté' },
+      CLOTURE:     { bg: 'bg-comar-neutral-bg',   text: 'text-gray-700',   label: 'Clôturé' },
     }
-    const c = config[etat] || { bg: 'bg-gray-100', text: 'text-gray-600', label: etat || '-' }
+    const c = config[etat] || { bg: 'bg-comar-neutral-bg', text: 'text-gray-600', label: etat || '-' }
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${c.bg} ${c.text}`}>
         {c.label}
@@ -430,7 +430,7 @@ Cette action clôturera définitivement le dossier.`
         <div className="p-6">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-comar-navy mb-4"></div>
               <p className="text-gray-600">Chargement des dossiers Finance...</p>
             </div>
           </div>
@@ -449,11 +449,11 @@ Cette action clôturera définitivement le dossier.`
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <div className="text-red-600 text-6xl mb-4">⚠️</div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Erreur de chargement</h2>
+              <h2 className="text-2xl font-bold text-comar-navy mb-2">Erreur de chargement</h2>
               <p className="text-gray-600 mb-4">{error}</p>
               <button
                 onClick={fetchFinanceDossiers}
-                className="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition"
+                className="bg-comar-navy text-white px-6 py-2 rounded-xl hover:bg-comar-navy-light transition"
               >
                 Réessayer
               </button>
@@ -474,14 +474,14 @@ Cette action clôturera définitivement le dossier.`
         {/* ── En-tête ── */}
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">💰 Dashboard Finance</h1>
+            <h1 className="text-3xl font-bold text-comar-navy">Dashboard Finance</h1>
             <p className="text-gray-600 mt-1">
               Liste de tous les dossiers au niveau Finance ({dossiers.length} au total)
             </p>
           </div>
           <button
             onClick={fetchFinanceDossiers}
-            className="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition flex items-center gap-2 font-semibold"
+            className="bg-comar-navy text-white px-6 py-3 rounded-xl hover:bg-comar-navy-light transition flex items-center gap-2 font-semibold"
           >
             <span className="text-xl">🔄</span>
             Actualiser
@@ -492,52 +492,48 @@ Cette action clôturera définitivement le dossier.`
         {dossiers.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             {/* Total */}
-            <div className="bg-white shadow rounded-lg p-4">
+            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500 font-medium">Total</p>
-                  <p className="text-2xl font-bold text-gray-800">{dossiers.length}</p>
+                  <p className="text-2xl font-bold text-comar-navy">{dossiers.length}</p>
                 </div>
-                <div className="text-3xl">📋</div>
               </div>
             </div>
 
             {/* Conformités validées */}
-            <div className="bg-white shadow rounded-lg p-4">
+            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500 font-medium">Conformités validées</p>
-                  <p className="text-2xl font-bold text-green-600">
+                  <p className="text-2xl font-bold text-emerald-600">
                     {dossiers.filter((d) => d.dossier_details_finance?.[0]?.conformite_validee === true).length}
                   </p>
                 </div>
-                <div className="text-3xl">✅</div>
               </div>
             </div>
 
             {/* Documents complets */}
-            <div className="bg-white shadow rounded-lg p-4">
+            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500 font-medium">Docs complets</p>
-                  <p className="text-2xl font-bold text-blue-600">
+                  <p className="text-2xl font-bold text-comar-navy">
                     {dossiers.filter((d) => d.dossier_details_prestation?.[0]?.document_complet === true).length}
                   </p>
                 </div>
-                <div className="text-3xl">📄</div>
               </div>
             </div>
 
             {/* Quittances signées */}
-            <div className="bg-white shadow rounded-lg p-4">
+            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500 font-medium">Quittances signées</p>
-                  <p className="text-2xl font-bold text-purple-600">
+                  <p className="text-2xl font-bold text-violet-600">
                     {dossiers.filter((d) => d.dossier_details_prestation?.[0]?.quittance_signee === true).length}
                   </p>
                 </div>
-                <div className="text-3xl">📝</div>
               </div>
             </div>
           </div>
@@ -545,48 +541,47 @@ Cette action clôturera définitivement le dossier.`
 
         {/* ── Message si aucun dossier ── */}
         {dossiers.length === 0 ? (
-          <div className="bg-white shadow-lg rounded-lg p-12 text-center">
-            <div className="text-6xl mb-4">📂</div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">Aucun dossier Finance</h3>
+          <div className="bg-white rounded-xl border border-comar-neutral-border p-12 text-center">
+            <h3 className="text-xl font-semibold text-comar-navy mb-2">Aucun dossier Finance</h3>
             <p className="text-gray-600">Aucun dossier n'est actuellement au niveau FINANCE.</p>
           </div>
         ) : (
           /* ── Tableau des dossiers ── */
-          <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+          <div className="bg-white rounded-xl border border-comar-neutral-border overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-comar-neutral-border">
+                <thead className="bg-comar-navy">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       Souscripteur
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       N° Police
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       Agence
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       Montant
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       Doc. Complet
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       Quittance Signée
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       Conformité Validée
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       État
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white divide-y divide-comar-neutral-border">
                   {dossiers.map((dossier) => {
                     const detailsPrestation = dossier.dossier_details_prestation?.[0] || {}
                     const detailsFinance    = dossier.dossier_details_finance?.[0]    || {}
@@ -605,7 +600,7 @@ Cette action clôturera définitivement le dossier.`
                       !isSaving
 
                     return (
-                      <tr key={dossier.id} className="hover:bg-gray-50 transition">
+                      <tr key={dossier.id} className="hover:bg-comar-navy-50/30 transition-colors duration-150">
 
                         {/* Souscripteur */}
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -691,7 +686,7 @@ Cette action clôturera définitivement le dossier.`
                                   ? 'Dossier déjà clôturé'
                                   : 'Confirmer le paiement et clôturer le dossier'
                               }
-                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-md hover:bg-blue-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-comar-navy text-white text-xs font-semibold rounded-md hover:bg-comar-navy-light transition disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               💳 Confirmer paiement
                             </button>
@@ -738,7 +733,7 @@ Cette action clôturera définitivement le dossier.`
             <div className="px-6 py-5 space-y-5">
 
               {/* Conformité validée */}
-              <div className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
+              <div className="flex items-center justify-between rounded-xl border border-comar-neutral-border px-4 py-3">
                 <label className="text-sm font-semibold text-gray-700 select-none" htmlFor="conformite_validee">
                   Conformité validée
                 </label>
@@ -774,7 +769,7 @@ Cette action clôturera définitivement le dossier.`
                   onChange={(e) =>
                     setConformiteForm((prev) => ({ ...prev, moyen_paiement: e.target.value }))
                   }
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="w-full border border-comar-neutral-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                 >
                   <option value="VIREMENT">💳 Virement</option>
                   <option value="CHEQUE">📃 Chèque</option>
@@ -796,25 +791,25 @@ Cette action clôturera définitivement le dossier.`
                   }
                   rows={3}
                   placeholder="Remarques ou observations..."
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="w-full border border-comar-neutral-border rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400"
                 />
               </div>
 
             </div>
 
             {/* ── Pied de modal ── */}
-            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-200">
+            <div className="px-6 py-4 bg-comar-neutral-bg flex justify-end gap-3 border-t border-comar-neutral-border">
               <button
                 onClick={closeConformiteModal}
                 disabled={isSaving}
-                className="px-5 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+                className="px-5 py-2 rounded-xl border border-comar-neutral-border text-sm font-medium text-gray-700 hover:bg-comar-neutral-bg transition disabled:opacity-50"
               >
                 Annuler
               </button>
               <button
                 onClick={handleConformiteSubmit}
                 disabled={isSaving}
-                className="px-5 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-50 flex items-center gap-2"
+                className="px-5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-50 flex items-center gap-2"
               >
                 {isSaving ? (
                   <>

@@ -13,13 +13,14 @@
  */
 export default function Button({ children, onClick, type = 'button', variant = 'primary', disabled = false, loading = false }) {
   // Classes CSS de base communes à tous les boutons
-  const base = 'w-full px-4 py-2 rounded-lg font-semibold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2'
+  const base = 'w-full px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm shadow-sm hover:shadow-md active:scale-[0.98]'
 
   // Styles spécifiques pour chaque variante de bouton
   const variants = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700',
-    secondary: 'bg-gray-200 text-gray-800 hover:bg-gray-300',
-    outline: 'border border-blue-600 text-blue-600 hover:bg-blue-50',
+    primary: 'bg-comar-navy text-white hover:bg-comar-navy-light',
+    secondary: 'bg-comar-neutral-bg text-comar-navy hover:bg-comar-neutral-border',
+    outline: 'border border-comar-navy text-comar-navy hover:bg-comar-navy-50',
+    danger: 'bg-comar-red text-white hover:bg-comar-red-light',
   }
 
   return (

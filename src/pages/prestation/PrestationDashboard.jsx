@@ -640,11 +640,11 @@ export default function PrestationDashboard() {
    */
   const renderBooleanBadge = (value) => {
     if (value === null || value === undefined) {
-      return <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-600">N/A</span>
+      return <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-comar-neutral-bg text-gray-600">N/A</span>
     }
     
     return value ? (
-      <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+      <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-emerald-50 text-emerald-700">
         ✓ Oui
       </span>
     ) : (
@@ -661,13 +661,13 @@ export default function PrestationDashboard() {
    */
   const renderEtatBadge = (etat) => {
     const etatConfig = {
-      'EN_COURS': { bg: 'bg-blue-100', text: 'text-blue-800', label: 'En cours' },
-      'EN_INSTANCE': { bg: 'bg-orange-100', text: 'text-orange-800', label: 'En instance' },
-      'CLOTURE': { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Clôturé' },
+      'EN_COURS': { bg: 'bg-comar-navy-50', text: 'text-comar-navy', label: 'En cours' },
+      'EN_INSTANCE': { bg: 'bg-amber-50', text: 'text-amber-700', label: 'En instance' },
+      'CLOTURE': { bg: 'bg-comar-neutral-bg', text: 'text-gray-800', label: 'Clôturé' },
       'ANNULE': { bg: 'bg-red-100', text: 'text-red-800', label: 'Annulé' }
     }
 
-    const config = etatConfig[etat] || { bg: 'bg-gray-100', text: 'text-gray-800', label: etat || 'N/A' }
+    const config = etatConfig[etat] || { bg: 'bg-comar-neutral-bg', text: 'text-gray-800', label: etat || 'N/A' }
 
     return (
       <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${config.bg} ${config.text}`}>
@@ -683,7 +683,7 @@ export default function PrestationDashboard() {
         <div className="p-6">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-comar-navy mb-4"></div>
               <p className="text-gray-600">Chargement des dossiers prestations...</p>
             </div>
           </div>
@@ -700,11 +700,11 @@ export default function PrestationDashboard() {
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <div className="text-red-600 text-6xl mb-4">⚠️</div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Erreur de chargement</h2>
+              <h2 className="text-2xl font-bold text-comar-navy mb-2">Erreur de chargement</h2>
               <p className="text-gray-600 mb-4">{error}</p>
               <button
                 onClick={fetchPrestationDossiers}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
+                className="bg-comar-navy text-white px-6 py-2 rounded-xl hover:bg-comar-navy-light transition"
               >
                 Réessayer
               </button>
@@ -721,14 +721,14 @@ export default function PrestationDashboard() {
         {/* En-tête */}
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">📊 Dashboard Prestations</h1>
+            <h1 className="text-3xl font-bold text-comar-navy">Dashboard Prestations</h1>
             <p className="text-gray-600 mt-1">
               Liste de tous les dossiers au niveau Prestation ({dossiers.length} au total)
             </p>
           </div>
           <button
             onClick={fetchPrestationDossiers}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition flex items-center gap-2 font-semibold"
+            className="bg-comar-navy text-white px-6 py-3 rounded-xl hover:bg-comar-navy-light transition flex items-center gap-2 font-semibold"
           >
             <span className="text-xl">🔄</span>
             Actualiser
@@ -739,22 +739,22 @@ export default function PrestationDashboard() {
         {dossiers.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
             {/* Total */}
-            <div className="bg-white shadow rounded-lg p-4">
+            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500 font-medium">Total</p>
-                  <p className="text-2xl font-bold text-gray-800">{dossiers.length}</p>
+                  <p className="text-2xl font-bold text-comar-navy">{dossiers.length}</p>
                 </div>
                 <div className="text-3xl">📋</div>
               </div>
             </div>
 
             {/* En cours */}
-            <div className="bg-white shadow rounded-lg p-4">
+            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500 font-medium">En cours</p>
-                  <p className="text-2xl font-bold text-blue-600">
+                  <p className="text-2xl font-bold text-comar-navy">
                     {dossiers.filter(d => d.etat === 'EN_COURS').length}
                   </p>
                 </div>
@@ -763,11 +763,11 @@ export default function PrestationDashboard() {
             </div>
 
             {/* Documents complets */}
-            <div className="bg-white shadow rounded-lg p-4">
+            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500 font-medium">Docs complets</p>
-                  <p className="text-2xl font-bold text-green-600">
+                  <p className="text-2xl font-bold text-emerald-600">
                     {dossiers.filter(d => d.dossier_details_prestation?.[0]?.document_complet === true).length}
                   </p>
                 </div>
@@ -776,11 +776,11 @@ export default function PrestationDashboard() {
             </div>
 
             {/* En instance */}
-            <div className="bg-white shadow rounded-lg p-4">
+            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500 font-medium">En instance</p>
-                  <p className="text-2xl font-bold text-orange-600">
+                  <p className="text-2xl font-bold text-amber-600">
                     {dossiers.filter(d => d.etat === 'EN_INSTANCE').length}
                   </p>
                 </div>
@@ -789,11 +789,11 @@ export default function PrestationDashboard() {
             </div>
 
             {/* Quittances signées */}
-            <div className="bg-white shadow rounded-lg p-4">
+            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500 font-medium">Quittances</p>
-                  <p className="text-2xl font-bold text-purple-600">
+                  <p className="text-2xl font-bold text-violet-600">
                     {dossiers.filter(d => d.dossier_details_prestation?.[0]?.quittance_signee === true).length}
                   </p>
                 </div>
@@ -805,48 +805,48 @@ export default function PrestationDashboard() {
 
         {/* Message si aucun dossier */}
         {dossiers.length === 0 ? (
-          <div className="bg-white shadow-lg rounded-lg p-12 text-center">
+          <div className="bg-white rounded-xl border border-comar-neutral-border p-12 text-center">
             <div className="text-6xl mb-4">📂</div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">Aucun dossier prestation</h3>
+            <h3 className="text-xl font-semibold text-comar-navy mb-2">Aucun dossier prestation</h3>
             <p className="text-gray-600">Aucun dossier n'est actuellement au niveau PRESTATION.</p>
           </div>
         ) : (
           /* Tableau des dossiers */
-          <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+          <div className="bg-white rounded-xl border border-comar-neutral-border overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-comar-neutral-border">
+                <thead className="bg-comar-navy">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       Souscripteur
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       N° Police
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       Agence
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       Date Réception
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       Montant
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       Doc. Complet
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       Quittance Signée
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       État
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white divide-y divide-comar-neutral-border">
                   {dossiers.map((dossier) => {
                     // Extraction des données jointes (peut être null/undefined)
                     const detailsRC = dossier.dossier_details_rc?.[0] || {}
@@ -866,7 +866,7 @@ export default function PrestationDashboard() {
                     const canTransferQuittance = isNiveauPrestation && isDocumentComplet && isQuittanceSignee && !isSaving
 
                     return (
-                      <tr key={dossier.id} className="hover:bg-gray-50 transition">
+                      <tr key={dossier.id} className="hover:bg-comar-navy-50/30 transition-colors duration-150">
                         {/* Souscripteur */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-semibold text-gray-900">
@@ -919,7 +919,7 @@ export default function PrestationDashboard() {
                               disabled={!canEdit}
                               className={`px-3 py-1 rounded transition text-xs font-semibold ${
                                 canEdit
-                                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                  ? 'bg-comar-navy text-white hover:bg-comar-navy-light'
                                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               }`}
                               title={!isNiveauPrestation ? 'Le dossier n\'est plus au niveau PRESTATION' : 'Modifier le dossier'}
@@ -931,7 +931,7 @@ export default function PrestationDashboard() {
                               disabled={!canMarkPieces}
                               className={`px-3 py-1 rounded transition text-xs font-semibold ${
                                 canMarkPieces
-                                  ? 'bg-green-600 text-white hover:bg-green-700'
+                                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
                                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               }`}
                               title={
@@ -949,7 +949,7 @@ export default function PrestationDashboard() {
                               disabled={!canTransferQuittance}
                               className={`px-3 py-1 rounded transition text-xs font-semibold ${
                                 canTransferQuittance
-                                  ? 'bg-purple-600 text-white hover:bg-purple-700'
+                                  ? 'bg-violet-600 text-white hover:bg-violet-700'
                                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               }`}
                               title={
@@ -974,7 +974,7 @@ export default function PrestationDashboard() {
             </div>
 
             {/* Footer avec statistiques */}
-            <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+            <div className="bg-comar-neutral-bg px-6 py-4 border-t border-comar-neutral-border">
               <div className="flex justify-between items-center text-sm text-gray-600">
                 <span>
                   Total : <span className="font-semibold text-gray-900">{dossiers.length}</span> dossier{dossiers.length > 1 ? 's' : ''}
@@ -1000,11 +1000,11 @@ export default function PrestationDashboard() {
 
             {/* Modal */}
             <div className="flex items-center justify-center min-h-screen p-4">
-              <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
+              <div className="relative bg-white rounded-xl shadow-xl max-w-2xl w-full p-6">
                 {/* En-tête */}
                 <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800">
-                    ✏️ Modifier le dossier
+                  <h2 className="text-2xl font-bold text-comar-navy">
+                    Modifier le dossier
                   </h2>
                   <button
                     onClick={closeEditModal}
@@ -1015,7 +1015,7 @@ export default function PrestationDashboard() {
                 </div>
 
                 {/* Informations du dossier */}
-                <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <div className="bg-comar-neutral-bg rounded-xl p-4 mb-6">
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="font-semibold text-gray-700">Souscripteur : </span>
@@ -1045,7 +1045,7 @@ export default function PrestationDashboard() {
                         step="0.01"
                         min="0"
                         required
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-2 border border-comar-neutral-border rounded-xl focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy"
                         placeholder="Ex: 1500.00"
                       />
                     </div>
@@ -1062,7 +1062,7 @@ export default function PrestationDashboard() {
                         onChange={handleFormChange}
                         rows={4}
                         required
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-2 border border-comar-neutral-border rounded-xl focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy"
                         placeholder="Décrivez le motif de l'instance..."
                       />
                     </div>
@@ -1077,7 +1077,7 @@ export default function PrestationDashboard() {
                           name="document_complet"
                           checked={formData.document_complet}
                           onChange={handleFormChange}
-                          className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          className="w-5 h-5 text-comar-navy border-comar-neutral-border rounded focus:ring-comar-navy/20"
                         />
                         <label htmlFor="document_complet" className="ml-3 text-sm font-medium text-gray-700">
                           Document complet
@@ -1092,7 +1092,7 @@ export default function PrestationDashboard() {
                           name="quittance_signee"
                           checked={formData.quittance_signee}
                           onChange={handleFormChange}
-                          className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          className="w-5 h-5 text-comar-navy border-comar-neutral-border rounded focus:ring-comar-navy/20"
                         />
                         <label htmlFor="quittance_signee" className="ml-3 text-sm font-medium text-gray-700">
                           Quittance signée
@@ -1123,14 +1123,14 @@ export default function PrestationDashboard() {
                       type="button"
                       onClick={closeEditModal}
                       disabled={isSaving}
-                      className="px-6 py-2 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+                      className="px-6 py-2 border border-comar-neutral-border text-gray-700 font-semibold rounded-xl hover:bg-comar-neutral-bg transition disabled:opacity-50"
                     >
                       Annuler
                     </button>
                     <button
                       type="submit"
                       disabled={isSaving}
-                      className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="px-6 py-2 bg-comar-navy text-white font-semibold rounded-xl hover:bg-comar-navy-light transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       {isSaving ? (
                         <>

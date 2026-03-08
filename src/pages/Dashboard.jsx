@@ -80,12 +80,11 @@ export default function Dashboard() {
   const roleInfo = getRoleDisplay()
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
+    <div className="min-h-screen bg-comar-neutral-bg p-8">
       <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-lg p-8">
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-4xl">{roleInfo.icon}</span>
-            <h1 className="text-3xl font-bold text-gray-800">
+        <div className="bg-white rounded-2xl border border-comar-neutral-border p-8">
+          <div className="mb-4">
+            <h1 className="text-3xl font-bold text-comar-navy">
               {roleInfo.title}
             </h1>
           </div>
@@ -94,12 +93,12 @@ export default function Dashboard() {
             <p className="text-gray-600 mb-3">
               {roleInfo.description}
             </p>
-            <div className="bg-gray-50 rounded-lg p-4 space-y-1">
+            <div className="bg-comar-neutral-bg rounded-xl p-4 space-y-1">
               <p className="text-sm text-gray-600">
-                Email : <span className="font-medium text-gray-700">{user?.email}</span>
+                Email : <span className="font-medium text-comar-navy">{user?.email}</span>
               </p>
               <p className="text-sm text-gray-600">
-                Rôle : <span className="font-medium text-gray-700">{role || 'Non défini'}</span>
+                Rôle : <span className="font-medium text-comar-navy">{role || 'Non défini'}</span>
               </p>
             </div>
           </div>

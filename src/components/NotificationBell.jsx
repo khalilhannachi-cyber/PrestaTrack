@@ -76,24 +76,24 @@ export default function NotificationBell() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="relative p-2 text-gray-600 hover:text-gray-800 focus:outline-none"
+        className="relative p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
         title="Notifications"
       >
-        <span className="text-xl">🔔</span>
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+          <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold leading-none text-white bg-comar-red rounded-full shadow-sm">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-96 overflow-hidden flex flex-col">
+        <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-comar-neutral-border z-50 max-h-96 overflow-hidden flex flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-800">Notifications</h3>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-comar-neutral-border bg-comar-neutral-bg/50">
+            <h3 className="text-sm font-semibold text-comar-navy">Notifications</h3>
             {unreadCount > 0 && (
-              <button onClick={markAllRead} className="text-xs text-blue-600 hover:text-blue-800 font-medium">
+              <button onClick={markAllRead} className="text-xs text-comar-navy hover:text-comar-navy-light font-medium transition-colors">
                 Tout marquer comme lu
               </button>
             )}
@@ -102,15 +102,18 @@ export default function NotificationBell() {
           {/* Liste */}
           <div className="overflow-y-auto flex-1">
             {notifications.length === 0 ? (
-              <div className="p-6 text-center text-gray-400 text-sm">Aucune notification</div>
+              <div className="p-6 text-center text-gray-400 text-sm">
+                <svg className="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>
+                Aucune notification
+              </div>
             ) : (
               notifications.map(n => (
                 <div
                   key={n.id}
                   onClick={() => { if (!n.is_read) markAsRead(n.id) }}
-                  className={`px-4 py-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition ${!n.is_read ? 'bg-blue-50' : ''}`}
+                  className={`px-4 py-3 border-b border-comar-neutral-border/50 cursor-pointer hover:bg-comar-navy-50/50 transition-colors duration-150 ${!n.is_read ? 'bg-comar-navy-50 border-l-2 border-l-comar-navy' : ''}`}
                 >
-                  <p className={`text-sm ${!n.is_read ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
+                  <p className={`text-sm ${!n.is_read ? 'font-semibold text-comar-navy' : 'text-gray-600'}`}>
                     {n.message || n.title || 'Notification'}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">

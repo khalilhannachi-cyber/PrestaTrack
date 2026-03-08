@@ -1,1 +1,66 @@
 @import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════
+   COMAR Assurances — Design System
+   Palette extraite du logo officiel
+   ═══════════════════════════════════════════════════════════════ */
+
+@theme {
+  /* Primary — Navy Blue (logo text + sail) */
+  --color-comar-navy: #1B2A4A;
+  --color-comar-navy-light: #2C4270;
+  --color-comar-navy-dark: #111D33;
+  --color-comar-navy-50: #E8EBF0;
+  --color-comar-navy-100: #C5CCD9;
+
+  /* Accent — COMAR Red (sail accent) */
+  --color-comar-red: #C8102E;
+  --color-comar-red-light: #E8293F;
+  --color-comar-red-dark: #A00D24;
+  --color-comar-red-50: #FDE8EC;
+
+  /* Neutrals */
+  --color-comar-bg: #F0F2F5;
+  --color-comar-card: #FFFFFF;
+  --color-comar-border: #E2E5EA;
+}
+
+/* Global base styles */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #F0F2F5;
+  color: #1B2A4A;
+}
+
+/* Smooth transitions for interactive elements */
+button, a, input, select, textarea {
+  transition: all 0.2s ease;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F0F2F5;
+}
+::-webkit-scrollbar-thumb {
+  background: #C5CCD9;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2C4270;
+}
+
+/* Focus ring utility */
+*:focus-visible {
+  outline: 2px solid #2C4270;
+  outline-offset: 2px;
+}

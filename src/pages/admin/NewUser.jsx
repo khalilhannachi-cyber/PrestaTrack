@@ -216,32 +216,32 @@ export default function NewUser() {
           <div className="mb-6 flex gap-4 print:hidden">
             <button
               onClick={handleDownloadPDF}
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition flex items-center gap-2 font-semibold"
+              className="bg-comar-navy text-white px-6 py-3 rounded-lg hover:bg-comar-navy-light transition flex items-center gap-2 font-semibold"
             >
-              📄 Télécharger en PDF
+              Télécharger en PDF
             </button>
             <button
               onClick={handleCreateAnother}
-              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition flex items-center gap-2 font-semibold"
+              className="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition flex items-center gap-2 font-semibold"
             >
-              ➕ Créer un autre utilisateur
+              Créer un autre utilisateur
             </button>
             <button
               onClick={handleBackToList}
               className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition flex items-center gap-2 font-semibold"
             >
-              📋 Retour à la liste
+              Retour à la liste
             </button>
           </div>
 
           {/* Fiche utilisateur - contenu imprimable */}
           <div
             ref={ficheRef}
-            className="bg-white shadow-2xl rounded-lg p-8 border-2 border-gray-200"
+            className="bg-white rounded-xl p-8 border-2 border-comar-neutral-border"
           >
             {/* En-tête */}
-            <div className="text-center mb-8 border-b-2 border-blue-600 pb-6">
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            <div className="text-center mb-8 border-b-2 border-comar-navy pb-6">
+              <h1 className="text-3xl font-bold text-comar-navy mb-2">
                 Fiche Utilisateur
               </h1>
               <p className="text-gray-600">Compte créé avec succès</p>
@@ -253,7 +253,7 @@ export default function NewUser() {
             {/* Informations utilisateur */}
             <div className="space-y-6">
               {/* ID */}
-              <div className="border-l-4 border-blue-600 pl-4">
+              <div className="border-l-4 border-comar-navy pl-4">
                 <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">
                   Identifiant unique
                 </p>
@@ -326,7 +326,7 @@ export default function NewUser() {
             </div>
 
             {/* Pied de page */}
-            <div className="mt-8 pt-6 border-t-2 border-gray-200 text-center text-sm text-gray-500">
+            <div className="mt-8 pt-6 border-t-2 border-comar-neutral-border text-center text-sm text-gray-500">
               <p>PrestaTrack - Système de gestion COMAR</p>
               <p className="mt-1">Document généré automatiquement</p>
             </div>
@@ -406,7 +406,7 @@ export default function NewUser() {
       <div className="mb-6">
         <button
           onClick={() => navigate('/admin/users')}
-          className="text-blue-600 hover:text-blue-800 mb-4"
+          className="text-comar-navy hover:text-comar-navy-light mb-4"
         >
           ← Retour à la liste
         </button>
@@ -420,10 +420,10 @@ export default function NewUser() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-6 space-y-6">
+      <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-comar-neutral-border p-6 space-y-6">
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-            Email <span className="text-red-500">*</span>
+          <label htmlFor="email" className="block text-sm font-medium text-comar-navy mb-2">
+            Email <span className="text-comar-red">*</span>
           </label>
           <input
             type="email"
@@ -432,8 +432,8 @@ export default function NewUser() {
             value={formData.email}
             onChange={handleChange}
             required
-            className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-              emailValid === null ? 'border-gray-300' :
+            className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 ${
+              emailValid === null ? 'border-comar-neutral-border' :
               emailValid ? 'border-green-500 bg-green-50' :
               'border-red-500 bg-red-50'
             }`}
@@ -461,8 +461,8 @@ export default function NewUser() {
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-            Mot de passe <span className="text-red-500">*</span>
+          <label htmlFor="password" className="block text-sm font-medium text-comar-navy mb-2">
+            Mot de passe <span className="text-comar-red">*</span>
           </label>
           <input
             type="password"
@@ -472,14 +472,14 @@ export default function NewUser() {
             onChange={handleChange}
             required
             minLength={6}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 border border-comar-neutral-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy"
             placeholder="Min. 6 caractères"
           />
         </div>
 
         <div>
-          <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 mb-2">
-            Nom complet <span className="text-red-500">*</span>
+          <label htmlFor="full_name" className="block text-sm font-medium text-comar-navy mb-2">
+            Nom complet <span className="text-comar-red">*</span>
           </label>
           <input
             type="text"
@@ -488,14 +488,14 @@ export default function NewUser() {
             value={formData.full_name}
             onChange={handleChange}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 border border-comar-neutral-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy"
             placeholder="Jean Dupont"
           />
         </div>
 
         <div>
-          <label htmlFor="role_id" className="block text-sm font-medium text-gray-700 mb-2">
-            Rôle <span className="text-red-500">*</span>
+          <label htmlFor="role_id" className="block text-sm font-medium text-comar-navy mb-2">
+            Rôle <span className="text-comar-red">*</span>
           </label>
           <select
             id="role_id"
@@ -503,7 +503,7 @@ export default function NewUser() {
             value={formData.role_id}
             onChange={handleChange}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 border border-comar-neutral-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy"
           >
             {roles.length === 0 ? (
               <option value="">Chargement des rôles...</option>
@@ -524,7 +524,7 @@ export default function NewUser() {
           <button
             type="submit"
             disabled={loading}
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="bg-comar-navy text-white px-6 py-2 rounded-md hover:bg-comar-navy-light disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
             {loading ? 'Création...' : 'Créer l\'Utilisateur'}
           </button>
