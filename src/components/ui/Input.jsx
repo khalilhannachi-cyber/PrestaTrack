@@ -19,7 +19,7 @@ export default function Input({ label, type = 'text', placeholder, value, onChan
     <div className="w-full">
       {/* Affichage du label si fourni */}
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-comar-navy mb-1.5">
           {label}
         </label>
       )}
@@ -32,15 +32,15 @@ export default function Input({ label, type = 'text', placeholder, value, onChan
         value={value}
         onChange={onChange}
         disabled={disabled}
-        className={`w-full px-4 py-2 border rounded-lg shadow-sm focus:outline-none focus:ring-2 transition disabled:opacity-50 disabled:cursor-not-allowed ${
+        className={`w-full px-4 py-2.5 border rounded-xl shadow-sm focus:outline-none focus:ring-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-gray-400 ${
           error
-            ? 'border-red-500 focus:ring-red-500 focus:border-red-500' // Style d'erreur
-            : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500' // Style normal
+            ? 'border-comar-red focus:ring-comar-red/30 focus:border-comar-red'
+            : 'border-comar-neutral-border focus:ring-comar-navy/20 focus:border-comar-navy'
         }`}
       />
       
       {/* Affichage du message d'erreur si présent */}
-      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-1.5 text-sm text-comar-red flex items-center gap-1"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>{error}</p>}
     </div>
   )
 }

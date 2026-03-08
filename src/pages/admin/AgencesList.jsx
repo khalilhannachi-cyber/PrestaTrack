@@ -108,7 +108,7 @@ export default function AgencesList() {
         <div className="p-6">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-comar-navy mb-4"></div>
               <p className="text-gray-600">Chargement des agences...</p>
             </div>
           </div>
@@ -121,7 +121,7 @@ export default function AgencesList() {
     <AdminLayout>
       <div className="p-6 max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Gestion des Agences</h1>
+        <h1 className="text-3xl font-bold text-comar-navy">Gestion des Agences</h1>
         <Button
           onClick={() => {
             setShowForm(!showForm)
@@ -149,8 +149,8 @@ export default function AgencesList() {
 
       {/* Formulaire d'ajout */}
       {showForm && (
-        <div className="bg-white shadow-md rounded-lg p-6 mb-6 border border-gray-200">
-          <h2 className="text-xl font-semibold mb-4 text-gray-800">Nouvelle Agence</h2>
+        <div className="bg-white rounded-xl p-6 mb-6 border border-comar-neutral-border">
+          <h2 className="text-xl font-semibold mb-4 text-comar-navy">Nouvelle Agence</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
@@ -196,7 +196,7 @@ export default function AgencesList() {
 
       {/* Liste des agences */}
       {agences.length === 0 ? (
-        <div className="bg-white shadow-md rounded-lg p-12 text-center border border-gray-200">
+        <div className="bg-white rounded-xl p-12 text-center border border-comar-neutral-border">
           <div className="text-gray-400 mb-2">
             <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -206,30 +206,30 @@ export default function AgencesList() {
           <p className="text-gray-400 text-sm mt-2">Cliquez sur "Nouvelle Agence" pour en créer une</p>
         </div>
       ) : (
-        <div className="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="bg-white rounded-xl overflow-hidden border border-comar-neutral-border">
+          <table className="min-w-full divide-y divide-comar-neutral-border">
+            <thead className="bg-comar-navy">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
                   Code
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
                   Nom de l'agence
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
                   Date de création
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-white/80 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-comar-neutral-border">
               {agences.map((agence) => (
-                <tr key={agence.id} className="hover:bg-gray-50 transition">
+                <tr key={agence.id} className="hover:bg-comar-navy-50/30 transition-colors duration-150">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-comar-navy-50 text-comar-navy">
                         {agence.code}
                       </span>
                     </div>

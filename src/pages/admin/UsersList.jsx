@@ -122,7 +122,7 @@ export default function UsersList() {
         <div className="p-6">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-comar-navy mb-4"></div>
               <p className="text-gray-600">Chargement des utilisateurs...</p>
             </div>
           </div>
@@ -138,44 +138,44 @@ export default function UsersList() {
         <h1 className="text-2xl font-bold">Gestion des Utilisateurs</h1>
         <Link
           to="/admin/users/nouveau"
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+          className="bg-comar-navy text-white px-4 py-2 rounded hover:bg-comar-navy-light transition"
         >
           + Nouvel Utilisateur
         </Link>
       </div>
 
       {users.length === 0 ? (
-        <div className="bg-white shadow rounded-lg p-8 text-center text-gray-500">
+        <div className="bg-white rounded-xl border border-comar-neutral-border p-8 text-center text-gray-500">
           Aucun utilisateur trouvé.
         </div>
       ) : (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="bg-white rounded-xl border border-comar-neutral-border overflow-hidden">
+          <table className="min-w-full divide-y divide-comar-neutral-border">
+            <thead className="bg-comar-navy">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
                   Email
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
                   Nom complet
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
                   Rôle
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
                   Statut
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
                   Date de création
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-comar-neutral-border">
               {users.map((user) => (
-                <tr key={user.id} className={`hover:bg-gray-50 ${!user.is_active ? 'opacity-60' : ''}`}>
+                <tr key={user.id} className={`hover:bg-comar-navy-50/30 transition-colors duration-150 ${!user.is_active ? 'opacity-60' : ''}`}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {user.email}
                   </td>
@@ -185,16 +185,16 @@ export default function UsersList() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                       user.roles?.name === 'ADMIN' ? 'bg-red-100 text-red-800' :
-                      user.roles?.name === 'RELATION_CLIENT' ? 'bg-blue-100 text-blue-800' :
+                      user.roles?.name === 'RELATION_CLIENT' ? 'bg-comar-navy-50 text-comar-navy' :
                       user.roles?.name === 'FINANCE' ? 'bg-green-100 text-green-800' :
-                      'bg-gray-100 text-gray-800'
+                      'bg-comar-neutral-bg text-gray-800'
                     }`}>
                       {user.roles?.name || 'N/A'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      user.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      user.is_active ? 'bg-green-100 text-green-800' : 'bg-comar-neutral-bg text-gray-800'
                     }`}>
                       {user.is_active ? 'Actif' : 'Inactif'}
                     </span>
@@ -215,7 +215,7 @@ export default function UsersList() {
                       </button>
                       <button
                         onClick={() => handleOpenEditRole(user)}
-                        className="text-blue-600 hover:text-blue-900 font-medium text-xs"
+                        className="text-comar-navy hover:text-comar-navy-light font-medium text-xs"
                         title="Modifier le rôle"
                       >
                         Modifier rôle
@@ -239,7 +239,7 @@ export default function UsersList() {
       {/* Modal pour modifier le rôle */}
       {editingUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
             <h2 className="text-xl font-bold mb-4">Modifier le rôle</h2>
             
             <div className="mb-4">
@@ -250,14 +250,14 @@ export default function UsersList() {
                 <strong>Rôle actuel:</strong> {editingUser.roles?.name}
               </p>
               
-              <label htmlFor="new_role" className="block text-sm font-medium text-gray-700 mb-2">
-                Nouveau rôle <span className="text-red-500">*</span>
+              <label htmlFor="new_role" className="block text-sm font-medium text-comar-navy mb-2">
+                Nouveau rôle <span className="text-comar-red">*</span>
               </label>
               <select
                 id="new_role"
                 value={newRoleId}
                 onChange={(e) => setNewRoleId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-comar-neutral-border rounded-md focus:outline-none focus:ring-2 focus:ring-comar-navy/20"
               >
                 <option value="">Sélectionnez un rôle</option>
                 {roles.map((role) => (
@@ -271,7 +271,7 @@ export default function UsersList() {
             <div className="flex gap-3">
               <button
                 onClick={handleUpdateRole}
-                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+                className="flex-1 bg-comar-navy text-white px-4 py-2 rounded hover:bg-comar-navy-light transition"
               >
                 Modifier
               </button>

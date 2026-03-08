@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
+import comarLogo from '../assets/LogoCOMAR.png'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -70,51 +71,73 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
-        <h1 className="text-2xl font-bold text-center text-gray-800 mb-6">
-          Connexion
-        </h1>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-comar-navy via-comar-navy-light to-comar-navy-dark relative overflow-hidden">
+      {/* Background decorative elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-comar-red/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-comar-navy-light/30 rounded-full blur-3xl"></div>
+      </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
-            {error}
+      <div className="relative w-full max-w-md">
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-2xl p-10">
+          {/* Logo area */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-24 h-16 mb-4">
+              <img src={comarLogo} alt="COMAR Assurances" className="h-full w-full object-contain" />
+            </div>
+            <h1 className="text-2xl font-bold text-comar-navy">
+              PrestaTrack
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">COMAR Assurances — Gestion des Prestations</p>
           </div>
-        )}
 
-        {success && (
-          <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">
-            Connexion réussie ! Redirection...
-          </div>
-        )}
+          {error && (
+            <div className="mb-4 p-3 bg-comar-red-50 border border-comar-red/20 text-comar-red rounded-xl text-sm flex items-center gap-2">
+              <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
+              {error}
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Email"
-            type="email"
-            name="email"
-            placeholder="exemple@email.com"
-            value={email}
-            onChange={(e) => { setEmail(e.target.value); setFieldErrors((p) => ({ ...p, email: null })) }}
-            error={fieldErrors.email}
-            disabled={loading}
-          />
+          {success && (
+            <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-sm flex items-center gap-2">
+              <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+              Connexion réussie ! Redirection...
+            </div>
+          )}
 
-          <Input
-            label="Mot de passe"
-            type="password"
-            name="password"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => { setPassword(e.target.value); setFieldErrors((p) => ({ ...p, password: null })) }}
-            error={fieldErrors.password}
-            disabled={loading}
-          />
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <Input
+              label="Email"
+              type="email"
+              name="email"
+              placeholder="exemple@comar.tn"
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setFieldErrors((p) => ({ ...p, email: null })) }}
+              error={fieldErrors.email}
+              disabled={loading}
+            />
 
-          <Button type="submit" variant="primary" loading={loading}>
-            Se connecter
-          </Button>
-        </form>
+            <Input
+              label="Mot de passe"
+              type="password"
+              name="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => { setPassword(e.target.value); setFieldErrors((p) => ({ ...p, password: null })) }}
+              error={fieldErrors.password}
+              disabled={loading}
+            />
+
+            <Button type="submit" variant="primary" loading={loading}>
+              Se connecter
+            </Button>
+          </form>
+
+          <p className="text-center text-xs text-gray-400 mt-6">
+            © {new Date().getFullYear()} COMAR Assurances — PrestaTrack
+          </p>
+        </div>
       </div>
     </div>
   )
