@@ -26,6 +26,7 @@ export default function NewDossier() {
   const [loading, setLoading] = useState(false)
   const [agences, setAgences] = useState([])
   const [loadingAgences, setLoadingAgences] = useState(true)
+  const [file, setFile] = useState(null)
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -71,8 +72,38 @@ export default function NewDossier() {
       return
     }
 
+    if (file && !['application/pdf', 'image/png', 'image/jpeg'].includes(file.type)) {
+      toast.error("Format de fichier non autorisé. Seuls PDF, PNG et JPG sont acceptés.");
+      return;
+    }
+    if (file && file.size > 5 * 1024 * 1024) {
+      toast.error("Le fichier dépasse 5Mo.");
+      return;
+    }
+
     setLoading(true)
     try {
+      let piece_justificative_url = null
+      if (file) {
+        toast('Téléchargement du fichier en cours...')
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+        
+        const { error: uploadError } = await supabase.storage
+          .from('pieces_justificatives')
+          .upload(fileName, file)
+          
+        if (uploadError) throw new Error(`Erreur upload fichier: ${uploadError.message}`)
+        
+        const { data: urlData } = supabase.storage
+          .from('pieces_justificatives')
+          .getPublicUrl(fileName)
+          
+        if (urlData) {
+          piece_justificative_url = urlData.publicUrl
+        }
+      }
+
       // ÉTAPE 1 : Insertion dans la table 'dossiers'
       const { data: dossierData, error: dossierError } = await supabase
         .from('dossiers')
@@ -82,7 +113,8 @@ export default function NewDossier() {
           agence_id: formData.agence_id || null,
           niveau,
           etat: 'EN_COURS',
-          created_by: user.id
+          created_by: user.id,
+          piece_justificative_url
         }])
         .select()
 
@@ -254,6 +286,36 @@ export default function NewDossier() {
                 <option value="Transfert Contrat">Transfert Contrat</option>
                 <option value="Autre">Autre</option>
               </select>
+            </div>
+
+            <div>
+              <label htmlFor="piece_justificative" className="block text-sm font-medium text-comar-navy mb-1.5">
+                Pièce Justificative <span className="text-xs text-gray-500 font-normal">(Max 5Mo, PDF/PNG/JPG)</span>
+              </label>
+              <input 
+                type="file" 
+                id="piece_justificative" 
+                accept=".pdf,.png,.jpg,.jpeg"
+                onChange={(e) => {
+                  const selectedFile = e.target.files[0];
+                  if (selectedFile) {
+                    if (selectedFile.size > 5 * 1024 * 1024) {
+                      alert("Le fichier dépasse 5Mo !");
+                      e.target.value = null;
+                      setFile(null);
+                    } else if (!['application/pdf', 'image/png', 'image/jpeg'].includes(selectedFile.type)) {
+                      alert("Format de fichier non autorisé. Seuls PDF, PNG et JPG sont acceptés.");
+                      e.target.value = null;
+                      setFile(null);
+                    } else {
+                      setFile(selectedFile);
+                    }
+                  } else {
+                    setFile(null);
+                  }
+                }} 
+                className="w-full px-4 py-2.5 border border-comar-neutral-border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-comar-teal-50 file:text-comar-teal hover:file:bg-comar-teal-100" 
+              />
             </div>
 
             <div>

@@ -278,6 +278,17 @@ export default function DossierDetail() {
                   <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Motif d'Instance</h3>
                   <p className="text-sm text-comar-navy bg-comar-neutral-bg p-3 rounded-xl">{detailsRC?.motif_instance || <span className="text-gray-400 italic">Non renseigné</span>}</p>
                 </div>
+                {dossier.piece_justificative_url && (
+                  <div>
+                    <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Pièce Justificative</h3>
+                    <a href={dossier.piece_justificative_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-comar-teal-50 text-comar-teal font-medium rounded-xl hover:bg-comar-teal-100 transition-colors">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+                      </svg>
+                      Voir la pièce
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
 
