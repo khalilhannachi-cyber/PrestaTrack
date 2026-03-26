@@ -34,7 +34,7 @@ export default function NewDossier() {
     souscripteur: '',
     police_number: '',
     agence_id: '',
-    telephone: '',
+    telephone: '+216 ',
     demande_initiale: '',
     motif_instance: '',
     date_reception: today // Date réception bureau d'ordre – défaut aujourd'hui, modifiable
@@ -218,7 +218,7 @@ export default function NewDossier() {
                 </label>
                 <input type="tel" id="telephone" name="telephone" value={formData.telephone} onChange={handleChange}
                   className="w-full px-4 py-2.5 border border-comar-neutral-border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all"
-                  placeholder="Ex: +212 6 12 34 56 78" />
+                  placeholder="Ex: +216 20 123 456" />
               </div>
 
               {/* Agence (obligatoire) */}
