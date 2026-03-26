@@ -34,7 +34,7 @@ export default function Login() {
   // Soumission du formulaire
   const handleSubmit = async (e) => {
     e.preventDefault()  // Empêche le rechargement de la page
-    console.log('📝 [Login] Soumission du formulaire')
+    console.log(' [Login] Soumission du formulaire')
     setError(null)
     setSuccess(false)
 
@@ -42,11 +42,11 @@ export default function Login() {
     const errors = validate()
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) {
-      console.log('⚠️ [Login] Erreurs de validation:', errors)
+      console.log('️ [Login] Erreurs de validation:', errors)
       return  // Arrêt si erreurs de validation
     }
 
-    console.log('✅ [Login] Validation réussie, tentative de connexion...')
+    console.log(' [Login] Validation réussie, tentative de connexion...')
     setLoading(true)  // Activation du loader
 
     try {
@@ -54,16 +54,16 @@ export default function Login() {
       // Cette fonction appelle Supabase Auth et récupère le rôle
       await signIn(email, password)
       
-      console.log('🎉 [Login] Connexion réussie ! Redirection dans 1s...')
+      console.log(' [Login] Connexion réussie ! Redirection dans 1s...')
       setSuccess(true)
       // Redirection vers le dashboard après 1 seconde
       setTimeout(() => {
-        console.log('🔀 [Login] Redirection vers /dashboard')
+        console.log(' [Login] Redirection vers /dashboard')
         navigate('/dashboard')
       }, 1000)
     } catch (err) {
       // Gestion des erreurs (mauvais identifiants, problème réseau, etc.)
-      console.error('❌ [Login] Erreur:', err.message)
+      console.error(' [Login] Erreur:', err.message)
       setError(err.message || 'Une erreur est survenue')
     } finally {
       setLoading(false)  // Désactivation du loader

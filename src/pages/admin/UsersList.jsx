@@ -1,3 +1,4 @@
+import { toast } from 'react-hot-toast'
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
@@ -61,11 +62,11 @@ export default function UsersList() {
 
       if (error) throw error
 
-      alert(`✅ Utilisateur ${newStatus ? 'activé' : 'désactivé'} avec succès`)
+      toast.success(`Utilisateur ${newStatus ? 'activé' : 'désactivé'} avec succès`)
       fetchUsers()
     } catch (error) {
       console.error('Erreur lors de la mise à jour:', error)
-      alert('❌ Erreur lors de la mise à jour du statut')
+      toast.error("Erreur lors de la mise à jour du statut")
     }
   }
 
@@ -76,7 +77,7 @@ export default function UsersList() {
 
   const handleUpdateRole = async () => {
     if (!newRoleId) {
-      alert('Veuillez sélectionner un rôle')
+      toast('Veuillez sélectionner un rôle')
       return
     }
 
@@ -88,17 +89,17 @@ export default function UsersList() {
 
       if (error) throw error
 
-      alert('✅ Rôle mis à jour avec succès')
+      toast.success("Rôle mis à jour avec succès")
       setEditingUser(null)
       fetchUsers()
     } catch (error) {
       console.error('Erreur lors de la mise à jour du rôle:', error)
-      alert('❌ Erreur lors de la mise à jour du rôle')
+      toast.error("Erreur lors de la mise à jour du rôle")
     }
   }
 
   const handleDeleteUser = async (userId) => {
-    if (!confirm('⚠️ Voulez-vous vraiment supprimer cet utilisateur ? Cette action est irréversible.')) return
+    if (!confirm('️ Voulez-vous vraiment supprimer cet utilisateur ? Cette action est irréversible.')) return
 
     try {
       const { error } = await supabase
@@ -108,11 +109,11 @@ export default function UsersList() {
 
       if (error) throw error
 
-      alert('✅ Utilisateur supprimé avec succès')
+      toast.success("Utilisateur supprimé avec succès")
       fetchUsers()
     } catch (error) {
       console.error('Erreur lors de la suppression:', error)
-      alert('❌ Erreur lors de la suppression de l\'utilisateur')
+      toast.error(' Erreur lors de la suppression de l\'utilisateur')
     }
   }
 

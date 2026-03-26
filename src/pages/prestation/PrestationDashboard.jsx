@@ -55,11 +55,11 @@ export default function PrestationDashboard() {
    */
   const logAction = async (dossierId, action, oldStatus, newStatus, description = '') => {
     try {
-      console.log(`📝 [PrestationDashboard] Enregistrement action: ${action} pour dossier #${dossierId}`)
+      console.log(` [PrestationDashboard] Enregistrement action: ${action} pour dossier #${dossierId}`)
       
       // Vérifier que l'utilisateur est authentifié
       if (!user || !user.id) {
-        console.warn('⚠️ [PrestationDashboard] Utilisateur non authentifié - historique non enregistré')
+        console.warn(' [PrestationDashboard] Utilisateur non authentifié - historique non enregistré')
         return false
       }
       
@@ -77,14 +77,14 @@ export default function PrestationDashboard() {
         ])
 
       if (error) {
-        console.error('⚠️ [PrestationDashboard] Erreur insertion historique:', error)
+        console.error(' [PrestationDashboard] Erreur insertion historique:', error)
         return false
       }
 
-      console.log('✅ [PrestationDashboard] Action enregistrée dans l\'historique')
+      console.log(' [PrestationDashboard] Action enregistrée dans l\'historique')
       return true
     } catch (err) {
-      console.error('❌ [PrestationDashboard] Erreur lors de l\'enregistrement de l\'action:', err)
+      console.error(' [PrestationDashboard] Erreur lors de l\'enregistrement de l\'action:', err)
       return false
     }
   }
@@ -142,7 +142,7 @@ export default function PrestationDashboard() {
 
       setDossiers(merged)
     } catch (err) {
-      console.error('❌ [PrestationDashboard] Erreur lors du chargement:', err)
+      console.error(' [PrestationDashboard] Erreur lors du chargement:', err)
       setError(err.message || 'Erreur inconnue lors du chargement des dossiers')
     } finally {
       if (!silent) setLoading(false)
@@ -156,7 +156,7 @@ export default function PrestationDashboard() {
   const openEditModal = (dossier) => {
     // Vérification que le niveau est bien PRESTATION
     if (dossier.niveau !== 'PRESTATION') {
-      alert('⚠️ Impossible d\'éditer ce dossier : il n\'est plus au niveau PRESTATION.')
+      alert(' Impossible d\'éditer ce dossier : il n\'est plus au niveau PRESTATION.')
       return
     }
 
@@ -212,7 +212,7 @@ export default function PrestationDashboard() {
 
     // Vérification d'authentification
     if (!user || !user.id) {
-      alert('⚠️ Votre session a expiré. Veuillez vous reconnecter.')
+      alert(' Votre session a expiré. Veuillez vous reconnecter.')
       closeEditModal()
       navigate('/login')
       return
@@ -220,7 +220,7 @@ export default function PrestationDashboard() {
 
     // Vérification de sécurité : niveau doit être PRESTATION
     if (editingDossier.niveau !== 'PRESTATION') {
-      alert('⚠️ Impossible de modifier : le dossier n\'est plus au niveau PRESTATION.')
+      alert(' Impossible de modifier : le dossier n\'est plus au niveau PRESTATION.')
       closeEditModal()
       return
     }
@@ -228,7 +228,7 @@ export default function PrestationDashboard() {
     setIsSaving(true)
 
     try {
-      console.log('🚀 [PrestationDashboard] Début de la modification du dossier #', editingDossier.id)
+      console.log(' [PrestationDashboard] Début de la modification du dossier #', editingDossier.id)
       
       const oldEtat = editingDossier.etat
       
@@ -236,7 +236,7 @@ export default function PrestationDashboard() {
       // ÉTAPE 1 : Mise à jour de dossier_details_prestation
       // Vérifier si la ligne existe, sinon la créer
       // ─────────────────────────────────────────────────────────────
-      console.log('📝 [PrestationDashboard] Étape 1 : Sauvegarde dossier_details_prestation')
+      console.log(' [PrestationDashboard] Étape 1 : Sauvegarde dossier_details_prestation')
 
       const prestationPayload = {
         montant: formData.montant !== '' ? parseFloat(formData.montant) : null,
@@ -250,7 +250,7 @@ export default function PrestationDashboard() {
         .from('dossier_details_prestation')
         .insert({ dossier_id: editingDossier.id, montant: null, document_complet: false, quittance_signee: false })
       if (ensureError && ensureError.code !== '23505') {
-        console.warn('⚠️ [PrestationDashboard] INSERT ensure:', ensureError.message)
+        console.warn(' [PrestationDashboard] INSERT ensure:', ensureError.message)
       }
 
       // UPDATE systématique — la ligne existe forcément maintenant
@@ -260,16 +260,16 @@ export default function PrestationDashboard() {
         .eq('dossier_id', editingDossier.id)
 
       if (updateError) {
-        console.error('❌ [PrestationDashboard] Erreur UPDATE prestation:', updateError)
+        console.error(' [PrestationDashboard] Erreur UPDATE prestation:', updateError)
         throw new Error(`Erreur mise à jour détails prestation: ${updateError.message}`)
       }
 
-      console.log('✅ [PrestationDashboard] Détails prestation mis à jour')
+      console.log(' [PrestationDashboard] Détails prestation mis à jour')
 
       // ─────────────────────────────────────────────────────────────
       // ÉTAPE 1b : Mise à jour de motif_instance dans dossier_details_rc
       // ─────────────────────────────────────────────────────────────
-      console.log('📝 [PrestationDashboard] Étape 1b : Mise à jour motif_instance dans dossier_details_rc')
+      console.log(' [PrestationDashboard] Étape 1b : Mise à jour motif_instance dans dossier_details_rc')
       
       const { error: rcError } = await supabase
         .from('dossier_details_rc')
@@ -279,17 +279,17 @@ export default function PrestationDashboard() {
         .eq('dossier_id', editingDossier.id)
 
       if (rcError) {
-        console.error('❌ [PrestationDashboard] Erreur mise à jour RC:', rcError)
+        console.error(' [PrestationDashboard] Erreur mise à jour RC:', rcError)
         throw new Error(`Erreur lors de la mise à jour du motif d'instance: ${rcError.message}`)
       }
 
-      console.log('✅ [PrestationDashboard] Motif d\'instance mis à jour')
+      console.log(' [PrestationDashboard] Motif d\'instance mis à jour')
 
       // ─────────────────────────────────────────────────────────────
       // ÉTAPE 2 : Mise à jour de l'état du dossier
       // L'état reste EN_COURS - Les boutons s'activent en fonction de document_complet
       // ─────────────────────────────────────────────────────────────
-      console.log('📝 [PrestationDashboard] Étape 2 : Mise à jour de updated_at')
+      console.log(' [PrestationDashboard] Étape 2 : Mise à jour de updated_at')
       
       const { error: dossierError } = await supabase
         .from('dossiers')
@@ -300,11 +300,11 @@ export default function PrestationDashboard() {
         .eq('niveau', 'PRESTATION') // Double vérification de sécurité
 
       if (dossierError) {
-        console.error('❌ [PrestationDashboard] Erreur mise à jour dossier:', dossierError)
+        console.error(' [PrestationDashboard] Erreur mise à jour dossier:', dossierError)
         throw new Error(`Erreur lors de la mise à jour du dossier: ${dossierError.message}`)
       }
 
-      console.log('✅ [PrestationDashboard] Dossier mis à jour')
+      console.log(' [PrestationDashboard] Dossier mis à jour')
 
       // ─────────────────────────────────────────────────────────────
       // ÉTAPE 3 : Ajout dans l'historique des actions
@@ -339,11 +339,11 @@ export default function PrestationDashboard() {
         }
       }))
 
-      alert('✅ Dossier modifié avec succès !')
+      alert(' Dossier modifié avec succès !')
 
     } catch (err) {
-      console.error('❌ [PrestationDashboard] Erreur lors de la modification:', err)
-      alert(`❌ Erreur: ${err.message}`)
+      console.error(' [PrestationDashboard] Erreur lors de la modification:', err)
+      alert(` Erreur: ${err.message}`)
     } finally {
       setIsSaving(false)
     }
@@ -361,7 +361,7 @@ export default function PrestationDashboard() {
   const handlePiecesATraiter = async (dossier) => {
     // Vérification d'authentification
     if (!user || !user.id) {
-      alert('⚠️ Votre session a expiré. Veuillez vous reconnecter.')
+      alert(' Votre session a expiré. Veuillez vous reconnecter.')
       navigate('/login')
       return
     }
@@ -369,7 +369,7 @@ export default function PrestationDashboard() {
     // Vérification que le document est complet
     const detailsPrestation = dossier.dossier_details_prestation?.[0] || {}
     if (!detailsPrestation.document_complet) {
-      alert('⚠️ Le document doit être marqué comme complet pour traiter les pièces.')
+      alert(' Le document doit être marqué comme complet pour traiter les pièces.')
       return
     }
 
@@ -383,14 +383,14 @@ export default function PrestationDashboard() {
     setIsSaving(true)
 
     try {
-      console.log('🚀 [PrestationDashboard] Début du traitement des pièces pour dossier #', dossier.id)
+      console.log(' [PrestationDashboard] Début du traitement des pièces pour dossier #', dossier.id)
       
       const oldEtat = dossier.etat
 
       // ─────────────────────────────────────────────────────────────
       // ÉTAPE 1 : Mise à jour de l'état du dossier à EN_INSTANCE
       // ─────────────────────────────────────────────────────────────
-      console.log('📝 [PrestationDashboard] Étape 1 : Mise à jour de l\'état à EN_INSTANCE')
+      console.log(' [PrestationDashboard] Étape 1 : Mise à jour de l\'état à EN_INSTANCE')
       
       const { error: dossierError } = await supabase
         .from('dossiers')
@@ -401,16 +401,16 @@ export default function PrestationDashboard() {
         .eq('id', dossier.id)
 
       if (dossierError) {
-        console.error('❌ [PrestationDashboard] Erreur mise à jour état:', dossierError)
+        console.error(' [PrestationDashboard] Erreur mise à jour état:', dossierError)
         throw new Error(`Erreur lors de la mise à jour de l'état: ${dossierError.message}`)
       }
 
-      console.log('✅ [PrestationDashboard] État mis à jour à EN_INSTANCE')
+      console.log(' [PrestationDashboard] État mis à jour à EN_INSTANCE')
 
       // ─────────────────────────────────────────────────────────────
       // ÉTAPE 2 : Récupération des utilisateurs PRESTATION et FINANCE
       // ─────────────────────────────────────────────────────────────
-      console.log('📝 [PrestationDashboard] Étape 2 : Récupération des utilisateurs à notifier')
+      console.log(' [PrestationDashboard] Étape 2 : Récupération des utilisateurs à notifier')
       
       const { data: usersToNotify, error: usersError } = await supabase
         .from('users')
@@ -425,10 +425,10 @@ export default function PrestationDashboard() {
         .in('roles.name', ['PRESTATION', 'FINANCE'])
 
       if (usersError) {
-        console.error('❌ [PrestationDashboard] Erreur récupération utilisateurs:', usersError)
+        console.error(' [PrestationDashboard] Erreur récupération utilisateurs:', usersError)
         // On continue même si ça échoue
       } else {
-        console.log('✅ [PrestationDashboard] Utilisateurs à notifier:', usersToNotify?.length || 0)
+        console.log(' [PrestationDashboard] Utilisateurs à notifier:', usersToNotify?.length || 0)
         
         // Création des notifications pour chaque utilisateur
         if (usersToNotify && usersToNotify.length > 0) {
@@ -446,10 +446,10 @@ export default function PrestationDashboard() {
             .insert(notifications)
 
           if (notifError) {
-            console.error('⚠️ [PrestationDashboard] Erreur insertion notifications:', notifError)
+            console.error(' [PrestationDashboard] Erreur insertion notifications:', notifError)
             // On continue même si ça échoue
           } else {
-            console.log('✅ [PrestationDashboard] Notifications créées')
+            console.log(' [PrestationDashboard] Notifications créées')
           }
         }
       }
@@ -473,11 +473,11 @@ export default function PrestationDashboard() {
         d.id === dossier.id ? { ...d, etat: 'EN_INSTANCE' } : d
       ))
 
-      alert('✅ Pièces marquées pour traitement ! Les équipes ont été notifiées.')
+      alert(' Pièces marquées pour traitement ! Les équipes ont été notifiées.')
 
     } catch (err) {
-      console.error('❌ [PrestationDashboard] Erreur lors du traitement des pièces:', err)
-      alert(`❌ Erreur: ${err.message}`)
+      console.error(' [PrestationDashboard] Erreur lors du traitement des pièces:', err)
+      alert(` Erreur: ${err.message}`)
     } finally {
       setIsSaving(false)
     }
@@ -495,7 +495,7 @@ export default function PrestationDashboard() {
   const handleTransfertQuittance = async (dossier) => {
     // Vérification d'authentification
     if (!user || !user.id) {
-      alert('⚠️ Votre session a expiré. Veuillez vous reconnecter.')
+      alert(' Votre session a expiré. Veuillez vous reconnecter.')
       navigate('/login')
       return
     }
@@ -503,7 +503,7 @@ export default function PrestationDashboard() {
     // Vérification que le document est complet ET quittance_signee est true
     const detailsPrestation = dossier.dossier_details_prestation?.[0] || {}
     if (!detailsPrestation.document_complet || !detailsPrestation.quittance_signee) {
-      alert('⚠️ Le document doit être complet et la quittance signée pour transférer au service Finance.')
+      alert(' Le document doit être complet et la quittance signée pour transférer au service Finance.')
       return
     }
 
@@ -517,7 +517,7 @@ export default function PrestationDashboard() {
     setIsSaving(true)
 
     try {
-      console.log('🚀 [PrestationDashboard] Début du transfert de quittance pour dossier #', dossier.id)
+      console.log(' [PrestationDashboard] Début du transfert de quittance pour dossier #', dossier.id)
       
       const currentEtat = dossier.etat
 
@@ -530,7 +530,7 @@ export default function PrestationDashboard() {
       // ─────────────────────────────────────────────────────────────
       // ÉTAPE 1 : Récupération des utilisateurs FINANCE
       // ─────────────────────────────────────────────────────────────
-      console.log('📝 [PrestationDashboard] Étape 1 : Récupération des utilisateurs FINANCE à notifier')
+      console.log(' [PrestationDashboard] Étape 1 : Récupération des utilisateurs FINANCE à notifier')
       
       const { data: usersToNotify, error: usersError } = await supabase
         .from('users')
@@ -545,10 +545,10 @@ export default function PrestationDashboard() {
         .eq('roles.name', 'FINANCE')
 
       if (usersError) {
-        console.error('❌ [PrestationDashboard] Erreur récupération utilisateurs:', usersError)
+        console.error(' [PrestationDashboard] Erreur récupération utilisateurs:', usersError)
         // On continue même si ça échoue
       } else {
-        console.log('✅ [PrestationDashboard] Utilisateurs FINANCE à notifier:', usersToNotify?.length || 0)
+        console.log(' [PrestationDashboard] Utilisateurs FINANCE à notifier:', usersToNotify?.length || 0)
         
         // Création des notifications pour chaque utilisateur FINANCE
         if (usersToNotify && usersToNotify.length > 0) {
@@ -566,10 +566,10 @@ export default function PrestationDashboard() {
             .insert(notifications)
 
           if (notifError) {
-            console.error('⚠️ [PrestationDashboard] Erreur insertion notifications:', notifError)
+            console.error(' [PrestationDashboard] Erreur insertion notifications:', notifError)
             // On continue même si ça échoue
           } else {
-            console.log('✅ [PrestationDashboard] Notifications créées pour Finance')
+            console.log(' [PrestationDashboard] Notifications créées pour Finance')
           }
         }
       }
@@ -585,11 +585,11 @@ export default function PrestationDashboard() {
         `Quittance signée transférée physiquement au service Finance - en attente de validation`
       )
 
-      alert('✅ Quittance transférée au service Finance ! L\'équipe a été notifiée. Le dossier reste en instance jusqu\'à validation par Finance.')
+      alert(' Quittance transférée au service Finance ! L\'équipe a été notifiée. Le dossier reste en instance jusqu\'à validation par Finance.')
 
     } catch (err) {
-      console.error('❌ [PrestationDashboard] Erreur lors du transfert de quittance:', err)
-      alert(`❌ Erreur: ${err.message}`)
+      console.error(' [PrestationDashboard] Erreur lors du transfert de quittance:', err)
+      alert(` Erreur: ${err.message}`)
     } finally {
       setIsSaving(false)
     }
@@ -699,7 +699,7 @@ export default function PrestationDashboard() {
         <div className="p-6">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <div className="text-red-600 text-6xl mb-4">⚠️</div>
+              <div className="text-red-600 text-6xl mb-4"></div>
               <h2 className="text-2xl font-bold text-comar-navy mb-2">Erreur de chargement</h2>
               <p className="text-gray-600 mb-4">{error}</p>
               <button
@@ -730,7 +730,7 @@ export default function PrestationDashboard() {
             onClick={fetchPrestationDossiers}
             className="bg-comar-navy text-white px-6 py-3 rounded-xl hover:bg-comar-navy-light transition flex items-center gap-2 font-semibold"
           >
-            <span className="text-xl">🔄</span>
+            <span className="text-xl"></span>
             Actualiser
           </button>
         </div>
@@ -738,75 +738,76 @@ export default function PrestationDashboard() {
         {/* Statistiques rapides */}
         {dossiers.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-            {/* Total */}
-            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">Total</p>
-                  <p className="text-2xl font-bold text-comar-navy">{dossiers.length}</p>
+              {/* Total */}
+              <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Total</p>
+                    <p className="text-2xl font-bold text-comar-navy mt-1">{dossiers.length}</p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-comar-navy-50 flex items-center justify-center"><svg className="w-5 h-5 text-comar-navy" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg></div>
                 </div>
-                <div className="text-3xl">📋</div>
+              </div>
+
+              {/* En cours */}
+              <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">En cours</p>
+                    <p className="text-2xl font-bold text-sky-600 mt-1">
+                      {dossiers.filter(d => d.etat === 'EN_COURS').length}
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center"><svg className="w-5 h-5 text-sky-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" /></svg></div>
+                </div>
+              </div>
+
+              {/* Documents complets */}
+              <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Docs complets</p>
+                    <p className="text-2xl font-bold text-emerald-600 mt-1">
+                      {dossiers.filter(d => d.dossier_details_prestation?.[0]?.document_complet === true).length}
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center"><svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-9M10.125 2.25h.375a9 9 0 019 9v.375M10.125 2.25A3.375 3.375 0 0113.5 5.625v1.5c0 .621.504 1.125 1.125 1.125h1.5a3.375 3.375 0 013.375 3.375M9 15l2.25 2.25L15 12" /></svg></div>
+                </div>
+              </div>
+
+              {/* En instance */}
+              <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">En instance</p>
+                    <p className="text-2xl font-bold text-amber-600 mt-1">
+                      {dossiers.filter(d => d.etat === 'EN_INSTANCE').length}
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center"><svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
+                </div>
+              </div>
+
+              {/* Quittances signées */}
+              <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Quittances</p>
+                    <p className="text-2xl font-bold text-violet-600 mt-1">
+                      {dossiers.filter(d => d.dossier_details_prestation?.[0]?.quittance_signee === true).length}
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center"><svg className="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0118 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3l1.5 1.5 3-3.75" /></svg></div>
+                </div>
               </div>
             </div>
 
-            {/* En cours */}
-            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">En cours</p>
-                  <p className="text-2xl font-bold text-comar-navy">
-                    {dossiers.filter(d => d.etat === 'EN_COURS').length}
-                  </p>
-                </div>
-                <div className="text-3xl">🔄</div>
-              </div>
-            </div>
-
-            {/* Documents complets */}
-            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">Docs complets</p>
-                  <p className="text-2xl font-bold text-emerald-600">
-                    {dossiers.filter(d => d.dossier_details_prestation?.[0]?.document_complet === true).length}
-                  </p>
-                </div>
-                <div className="text-3xl">✅</div>
-              </div>
-            </div>
-
-            {/* En instance */}
-            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">En instance</p>
-                  <p className="text-2xl font-bold text-amber-600">
-                    {dossiers.filter(d => d.etat === 'EN_INSTANCE').length}
-                  </p>
-                </div>
-                <div className="text-3xl">⏳</div>
-              </div>
-            </div>
-
-            {/* Quittances signées */}
-            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">Quittances</p>
-                  <p className="text-2xl font-bold text-violet-600">
-                    {dossiers.filter(d => d.dossier_details_prestation?.[0]?.quittance_signee === true).length}
-                  </p>
-                </div>
-                <div className="text-3xl">📝</div>
-              </div>
-            </div>
-          </div>
         )}
 
         {/* Message si aucun dossier */}
         {dossiers.length === 0 ? (
           <div className="bg-white rounded-xl border border-comar-neutral-border p-12 text-center">
-            <div className="text-6xl mb-4">📂</div>
+            <div className="text-6xl mb-4"></div>
             <h3 className="text-xl font-semibold text-comar-navy mb-2">Aucun dossier prestation</h3>
             <p className="text-gray-600">Aucun dossier n'est actuellement au niveau PRESTATION.</p>
           </div>
@@ -924,7 +925,7 @@ export default function PrestationDashboard() {
                               }`}
                               title={!isNiveauPrestation ? 'Le dossier n\'est plus au niveau PRESTATION' : 'Modifier le dossier'}
                             >
-                              ✏️ Modifier
+                               Modifier
                             </button>
                             <button
                               onClick={() => handlePiecesATraiter(dossier)}
@@ -942,7 +943,7 @@ export default function PrestationDashboard() {
                                   : 'Marquer les pièces comme à traiter'
                               }
                             >
-                              📋 Pièces à traiter
+                               Pièces à traiter
                             </button>
                             <button
                               onClick={() => handleTransfertQuittance(dossier)}
@@ -962,7 +963,7 @@ export default function PrestationDashboard() {
                                   : 'Transférer la quittance au service Finance'
                               }
                             >
-                              💼 Transfert quittance
+                               Transfert quittance
                             </button>
                           </div>
                         </td>
@@ -1142,7 +1143,7 @@ export default function PrestationDashboard() {
                         </>
                       ) : (
                         <>
-                          💾 Enregistrer
+                           Enregistrer
                         </>
                       )}
                     </button>

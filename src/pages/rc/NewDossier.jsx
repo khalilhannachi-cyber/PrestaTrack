@@ -1,3 +1,4 @@
+import { toast } from 'react-hot-toast'
 // React hooks pour la gestion d'état et effets
 import { useState, useEffect } from 'react'
 // Navigation programmatique
@@ -52,8 +53,8 @@ export default function NewDossier() {
       if (error) throw error
       setAgences(data || [])
     } catch (error) {
-      console.error('❌ Erreur lors du chargement des agences:', error)
-      alert('Impossible de charger les agences. Réessayez.')
+      console.error(' Erreur lors du chargement des agences:', error)
+      toast('Impossible de charger les agences. Réessayez.')
     } finally {
       setLoadingAgences(false)
     }
@@ -66,7 +67,7 @@ export default function NewDossier() {
   const handleSave = async (niveau) => {
     // Validation manuelle des champs requis
     if (!formData.souscripteur || !formData.police_number || !formData.agence_id || !formData.motif_instance) {
-      alert('❌ Veuillez remplir tous les champs obligatoires (*).')
+      toast.error("Veuillez remplir tous les champs obligatoires (*).")
       return
     }
 
@@ -118,13 +119,13 @@ export default function NewDossier() {
       }])
 
       const msg = niveau === 'PRESTATION'
-        ? '✅ Dossier créé et envoyé au service Prestation !'
-        : '✅ Dossier enregistré avec succès !'
-      alert(msg)
+        ? ' Dossier créé et envoyé au service Prestation !'
+        : ' Dossier enregistré avec succès !'
+      toast(msg)
       navigate('/rc/dossiers')
     } catch (error) {
-      console.error('❌ [NewDossier]', error)
-      alert(`❌ ${error.message || 'Erreur lors de la création du dossier'}`)
+      console.error(' [NewDossier]', error)
+      toast.error(`${error.message || 'Erreur lors de la création du dossier'}`)
     } finally {
       setLoading(false)
     }

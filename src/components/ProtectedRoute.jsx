@@ -23,7 +23,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   const { user, role, loading } = useAuth()
 
   // Log pour le débogage de l'état d'authentification et d'autorisation
-  console.log('🛡️ [ProtectedRoute] État:', { loading, authenticated: !!user, role, allowedRoles })
+  console.log('️ [ProtectedRoute] État:', { loading, authenticated: !!user, role, allowedRoles })
 
   // ─────────────────────────────────────────────────────────────────────
   // Étape 1 : Gestion de l'état de chargement
@@ -47,7 +47,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   // L'option 'replace' empêche de revenir en arrière vers la page protégée
   if (!user) {
     // Log de la redirection pour le débogage
-    console.log('🚫 [ProtectedRoute] Non authentifié, redirection vers /login')
+    console.log(' [ProtectedRoute] Non authentifié, redirection vers /login')
     return <Navigate to="/login" replace />
   }
 
@@ -58,7 +58,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   // Si allowedRoles est défini et que le rôle actuel n'est pas dans la liste
   if (allowedRoles && !allowedRoles.includes(role)) {
     // Log du refus d'accès pour le débogage
-    console.log('🚫 [ProtectedRoute] Rôle non autorisé, redirection vers /unauthorized')
+    console.log(' [ProtectedRoute] Rôle non autorisé, redirection vers /unauthorized')
     return <Navigate to="/unauthorized" replace />
   }
 
@@ -66,7 +66,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   // Étape 4 : Accès autorisé - Affichage du contenu
   // ─────────────────────────────────────────────────────────────────────
   // Log de succès pour le débogage
-  console.log('✅ [ProtectedRoute] Accès autorisé')
+  console.log(' [ProtectedRoute] Accès autorisé')
   // Si l'utilisateur est authentifié ET autorisé (par rôle), affichage du contenu protégé
   return children
 }

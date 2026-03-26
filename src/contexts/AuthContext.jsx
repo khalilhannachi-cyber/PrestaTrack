@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }) => {
    * @returns {{ roleName: string|null, active: boolean }}
    */
   const fetchRole = async (userId) => {
-    console.log('🔍 [Auth] Fetching role for:', userId)
+    console.log(' [Auth] Fetching role for:', userId)
     const { data, error } = await supabase
       .from('users')
       .select('is_active, roles(name)')
@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }) => {
       .single()
 
     if (error || !data) {
-      console.error('❌ [Auth] Role fetch error:', error?.message)
+      console.error(' [Auth] Role fetch error:', error?.message)
       return { roleName: null, active: false }
     }
 
@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }) => {
       ? data.roles[0]?.name || null
       : data.roles?.name || null
 
-    console.log('✅ [Auth] Role:', roleName, '| Active:', data.is_active)
+    console.log(' [Auth] Role:', roleName, '| Active:', data.is_active)
     return { roleName, active: data.is_active ?? false }
   }
 
@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('🔔 [Auth] Event:', event, session?.user?.email || 'no user')
+        console.log(' [Auth] Event:', event, session?.user?.email || 'no user')
 
         if (!mounted) return
 
@@ -68,7 +68,7 @@ export const AuthProvider = ({ children }) => {
         // ── TOKEN_REFRESHED ─────────────────────────────────────
         // Le rôle ne change pas, on met juste à jour l'objet user
         if (event === 'TOKEN_REFRESHED') {
-          console.log('🔄 [Auth] Token refreshed, updating user object')
+          console.log(' [Auth] Token refreshed, updating user object')
           setUser(session.user)
           return
         }
@@ -87,13 +87,13 @@ export const AuthProvider = ({ children }) => {
             if (!mounted) return
 
             if (!active) {
-              console.warn('⚠️ [Auth] User inactive, signing out')
+              console.warn('️ [Auth] User inactive, signing out')
               setUser(null)
               setRole(null)
               setIsActive(false)
               await supabase.auth.signOut()
             } else if (!roleName) {
-              console.warn('⚠️ [Auth] No role, signing out')
+              console.warn('️ [Auth] No role, signing out')
               setUser(null)
               setRole(null)
               await supabase.auth.signOut()
@@ -102,7 +102,7 @@ export const AuthProvider = ({ children }) => {
               setIsActive(true)
             }
           } catch (err) {
-            console.error('❌ [Auth] Error in role fetch:', err)
+            console.error(' [Auth] Error in role fetch:', err)
             // En cas d'erreur réseau, on garde le user connecté
             // plutôt que de le déconnecter
           } finally {
@@ -115,7 +115,7 @@ export const AuthProvider = ({ children }) => {
     // Timeout de sécurité : si rien ne se passe en 8 secondes, arrêter le loading
     const safetyTimeout = setTimeout(() => {
       if (mounted && loading) {
-        console.warn('⚠️ [Auth] Safety timeout - forcing loading=false')
+        console.warn('️ [Auth] Safety timeout - forcing loading=false')
         setLoading(false)
       }
     }, 8000)
@@ -131,11 +131,11 @@ export const AuthProvider = ({ children }) => {
   // Connexion
   // ═══════════════════════════════════════════════════════════════
   const signIn = async (email, password) => {
-    console.log('🔑 [Auth] Signing in:', email)
+    console.log(' [Auth] Signing in:', email)
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
-      console.error('❌ [Auth] Sign in error:', error.message)
+      console.error(' [Auth] Sign in error:', error.message)
       throw error
     }
 
@@ -157,7 +157,7 @@ export const AuthProvider = ({ children }) => {
       setRole(roleName)
       setIsActive(true)
       setLoading(false)
-      console.log('✅ [Auth] Signed in successfully, role:', roleName)
+      console.log(' [Auth] Signed in successfully, role:', roleName)
     }
   }
 
@@ -165,7 +165,7 @@ export const AuthProvider = ({ children }) => {
   // Déconnexion
   // ═══════════════════════════════════════════════════════════════
   const signOut = async () => {
-    console.log('🚪 [Auth] Signing out')
+    console.log(' [Auth] Signing out')
     await supabase.auth.signOut()
     setUser(null)
     setRole(null)

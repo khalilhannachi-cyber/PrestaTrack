@@ -41,10 +41,11 @@ export default function RCLayout({ children }) {
   const navLinks = [
     { to: '/rc/dossiers', label: 'Mes Dossiers', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" /></svg>) },
     { to: '/rc/dossiers/nouveau', label: 'Nouveau Dossier', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>) },
+    { to: '/rc/dossiers-en-ligne', label: 'Dossiers en Ligne', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z" /></svg>) },
   ]
 
   return (
-    <div className="min-h-screen bg-comar-neutral-bg flex">
+    <div className="min-h-screen bg-comar-neutral-bg">
       {/* Sidebar */}
       <aside className="w-64 bg-comar-navy fixed h-full flex flex-col shadow-xl">
         {/* Header branding */}
@@ -101,7 +102,7 @@ export default function RCLayout({ children }) {
       </aside>
 
       {/* Contenu principal */}
-      <main className="flex-1 ml-64">
+      <main className="ml-64">
         {children}
       </main>
     </div>

@@ -1,3 +1,4 @@
+import { toast } from 'react-hot-toast'
 // React hooks pour la gestion d'état et effets
 import { useState, useEffect } from 'react'
 // Navigation et récupération des paramètres d'URL
@@ -80,8 +81,8 @@ export default function DossierDetail() {
         date_reception: rcData?.date_reception || ''
       })
     } catch (error) {
-      console.error('❌ [DossierDetail] Erreur:', error)
-      alert(`Dossier introuvable: ${error.message}`)
+      console.error(' [DossierDetail] Erreur:', error)
+      toast(`Dossier introuvable: ${error.message}`)
       navigate('/rc/dossiers')
     } finally {
       setLoading(false)
@@ -90,8 +91,8 @@ export default function DossierDetail() {
 
   // ── Sauvegarder les modifications ─────────────────────────────
   const handleSave = async () => {
-    if (!editForm.souscripteur || !editForm.police_number || !editForm.agence_id || !editForm.motif_instance) {
-      alert('❌ Veuillez remplir tous les champs obligatoires (*).')
+    if (!editForm.souscripteur || !editForm.police_number || !editForm.motif_instance) {
+      toast.error("Veuillez remplir tous les champs obligatoires (*).")
       return
     }
     setSaving(true)
@@ -109,13 +110,13 @@ export default function DossierDetail() {
 
       const { error: rcError } = await supabase
         .from('dossier_details_rc')
-        .update({
+        .upsert({
+          dossier_id: id,
           telephone: editForm.telephone,
           demande_initiale: editForm.demande_initiale,
           motif_instance: editForm.motif_instance,
           date_reception: editForm.date_reception || null
-        })
-        .eq('dossier_id', id)
+        }, { onConflict: 'dossier_id' })
       if (rcError) throw rcError
 
       await supabase.from('historique_actions').insert([{
@@ -124,11 +125,11 @@ export default function DossierDetail() {
         description: `Dossier modifié par ${user.email}`
       }])
 
-      alert('✅ Dossier modifié avec succès !')
+      toast.success("Dossier modifié avec succès !")
       setEditing(false)
       await fetchDossier()
     } catch (err) {
-      alert(`❌ Erreur : ${err.message}`)
+      toast.error(`Erreur : ${err.message}`)
     } finally {
       setSaving(false)
     }
@@ -152,10 +153,10 @@ export default function DossierDetail() {
         old_status: 'RELATION_CLIENT', new_status: 'PRESTATION'
       }])
 
-      alert('✅ Dossier transmis au service Prestation !')
+      toast.success("Dossier transmis au service Prestation !")
       navigate('/rc/dossiers')
     } catch (err) {
-      alert(`❌ ${err.message}`)
+      toast.error(`${err.message}`)
     } finally {
       setTransmitting(false)
     }
@@ -169,10 +170,10 @@ export default function DossierDetail() {
       await supabase.from('dossier_details_rc').delete().eq('dossier_id', id)
       const { error } = await supabase.from('dossiers').delete().eq('id', id)
       if (error) throw error
-      alert('✅ Dossier supprimé.')
+      toast.success("Dossier supprimé.")
       navigate('/rc/dossiers')
     } catch (err) {
-      alert(`❌ Erreur : ${err.message}`)
+      toast.error(`Erreur : ${err.message}`)
     }
   }
 
@@ -324,8 +325,8 @@ export default function DossierDetail() {
                   className="w-full px-4 py-2.5 border border-comar-neutral-border rounded-xl focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-comar-navy mb-1.5">Agence <span className="text-comar-red">*</span></label>
-                <select name="agence_id" value={editForm.agence_id} onChange={handleEditChange} required
+                  <label className="block text-sm font-medium text-comar-navy mb-1.5">Agence</label>
+                  <select name="agence_id" value={editForm.agence_id} onChange={handleEditChange}
                   className="w-full px-4 py-2.5 border border-comar-neutral-border rounded-xl focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all">
                   <option value="">-- Sélectionner --</option>
                   {agences.map(a => (

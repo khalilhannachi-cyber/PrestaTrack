@@ -32,7 +32,7 @@ export default function AgencesList() {
       if (error) throw error
       setAgences(data || [])
     } catch (error) {
-      console.error('❌ Erreur lors du chargement des agences:', error)
+      console.error(' Erreur lors du chargement des agences:', error)
       setError('Erreur lors du chargement des agences')
     } finally {
       setLoading(false)
@@ -73,7 +73,7 @@ export default function AgencesList() {
       // Masquer le message de succès après 3 secondes
       setTimeout(() => setSuccess(null), 3000)
     } catch (error) {
-      console.error('❌ Erreur lors de la création:', error)
+      console.error(' Erreur lors de la création:', error)
       setError(error.message || 'Erreur lors de la création de l\'agence')
     }
   }
@@ -97,7 +97,7 @@ export default function AgencesList() {
       // Masquer le message de succès après 3 secondes
       setTimeout(() => setSuccess(null), 3000)
     } catch (error) {
-      console.error('❌ Erreur lors de la suppression:', error)
+      console.error(' Erreur lors de la suppression:', error)
       setError('Erreur lors de la suppression de l\'agence. Elle est peut-être utilisée par des dossiers.')
     }
   }

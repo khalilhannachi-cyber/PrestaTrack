@@ -18,7 +18,7 @@ import RCLayout from '../../components/RCLayout'
  *
  * Filtres : Souscripteur | État | Date | Numéro Police
  */
-export default function DossiersList() {
+export default function DossiersEnLigneList() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [dossiers, setDossiers] = useState([])
@@ -44,7 +44,7 @@ export default function DossiersList() {
       const { data, error } = await supabase
         .from('dossiers')
         .select(`*, agences ( id, nom, code )`)
-        .eq('created_by', user.id)
+        .not('client_id', 'is', null) // Filtrer les dossiers créés en ligne par les clients
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -81,8 +81,7 @@ export default function DossiersList() {
       if (updateError) throw updateError
 
       await supabase.from('dossier_details_rc')
-        .update({ date_reception: new Date().toISOString().split('T')[0] })
-        .eq('dossier_id', dossier.id)
+        .upsert({ dossier_id: dossier.id, date_reception: new Date().toISOString().split('T')[0], motif_instance: dossier.rc_details?.motif_instance || 'Non spécifié' }, { onConflict: 'dossier_id' })
 
       await supabase.from('historique_actions').insert([{
         dossier_id: dossier.id, user_id: user.id,
@@ -172,18 +171,11 @@ export default function DossiersList() {
         {/* En-tête */}
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-comar-navy">Mes Dossiers</h1>
+            <h1 className="text-2xl font-bold text-comar-navy">Dossiers en Ligne</h1>
             <p className="text-sm text-gray-500 mt-1">
               {filteredDossiers.length} affiché{filteredDossiers.length > 1 ? 's' : ''} sur {dossiers.length}
             </p>
           </div>
-          <Link
-            to="/rc/dossiers/nouveau"
-            className="bg-comar-navy text-white px-5 py-2.5 rounded-xl hover:bg-comar-navy-light transition-all duration-200 flex items-center gap-2 font-semibold text-sm shadow-sm hover:shadow-md"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-            Nouveau Dossier
-          </Link>
         </div>
 
         {/* Statistiques */}
@@ -262,11 +254,8 @@ export default function DossiersList() {
         {dossiers.length === 0 ? (
           <div className="bg-white rounded-xl border border-comar-neutral-border p-12 text-center">
             <div className="w-16 h-16 rounded-2xl bg-comar-navy-50 flex items-center justify-center mx-auto mb-4"><svg className="w-8 h-8 text-comar-navy/40" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg></div>
-            <h3 className="text-lg font-semibold text-comar-navy mb-2">Aucun dossier</h3>
-            <p className="text-sm text-gray-500 mb-6">Vous n'avez pas encore créé de dossier.</p>
-            <Link to="/rc/dossiers/nouveau" className="inline-flex items-center gap-2 bg-comar-navy text-white px-5 py-2.5 rounded-xl hover:bg-comar-navy-light transition-all duration-200 font-semibold text-sm shadow-sm">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> Créer votre premier dossier
-            </Link>
+            <h3 className="text-lg font-semibold text-comar-navy mb-2">Aucun dossier en ligne</h3>
+            <p className="text-sm text-gray-500 mb-6">Il n'y a actuellement aucune demande envoyée depuis la plateforme en ligne.</p>
           </div>
         ) : filteredDossiers.length === 0 ? (
           <div className="bg-white rounded-xl border border-comar-neutral-border p-12 text-center">
@@ -331,12 +320,6 @@ export default function DossiersList() {
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-comar-navy text-white text-[11px] font-semibold rounded-lg hover:bg-comar-navy-light transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed">
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" /></svg>
                               Modifier
-                            </button>
-                            <button onClick={() => handleSupprimer(dossier)} disabled={!isRC || isBusy}
-                              title={isRC ? 'Supprimer le dossier' : 'Suppression impossible'}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-comar-red text-white text-[11px] font-semibold rounded-lg hover:bg-comar-red-light transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed">
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
-                              Supprimer
                             </button>
                           </div>
                         </td>

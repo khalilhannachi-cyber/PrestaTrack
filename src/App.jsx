@@ -7,8 +7,10 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 // Composant de protection des routes
 import ProtectedRoute from './components/ProtectedRoute'
+import { Toaster } from 'react-hot-toast'
 // Pages Relation Client
 import DossiersList from './pages/rc/DossiersList'
+import DossiersEnLigneList from './pages/rc/DossiersEnLigneList'
 import NewDossier from './pages/rc/NewDossier'
 import DossierDetail from './pages/rc/DossierDetail'
 // Pages Administrateur
@@ -36,6 +38,32 @@ function App() {
   return (
     // AuthProvider enveloppe toute l'application pour fournir le contexte d'authentification
     <AuthProvider>
+      <Toaster 
+        position="top-center" 
+        toastOptions={{
+          style: {
+            background: '#ffffff',
+            color: '#1a202c',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            borderRadius: '0.75rem',
+            padding: '16px',
+            fontSize: '14px',
+            fontWeight: '500'
+          },
+          success: {
+            iconTheme: {
+              primary: '#059669', // emerald-600
+              secondary: '#fff',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#dc2626', // red-600
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
       <BrowserRouter>
         <Routes>
           {/* Route publique - Page de connexion */}
@@ -64,14 +92,24 @@ function App() {
               </ProtectedRoute>
             }
           />
-          
-          {/* Création d'un nouveau dossier */}
-          <Route
-            path="/rc/dossiers/nouveau"
-            element={
-              <ProtectedRoute allowedRoles={['RELATION_CLIENT']}>
-                <NewDossier />
-              </ProtectedRoute>
+
+            <Route
+              path="/rc/dossiers/nouveau"
+              element={
+                <ProtectedRoute allowedRoles={['RELATION_CLIENT']}>
+                  <NewDossier />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/rc/dossiers-en-ligne"
+              element={
+                <ProtectedRoute allowedRoles={['RELATION_CLIENT']}>
+                  <DossiersEnLigneList />
+                </ProtectedRoute>
+              }
+            />
             }
           />
           

@@ -1,3 +1,4 @@
+import { toast } from 'react-hot-toast'
 /**
  * Page de création d'un nouvel utilisateur par l'admin
  * 
@@ -8,7 +9,7 @@
  * - Export PDF de la fiche utilisateur
  * - Options : créer un autre utilisateur ou retourner à la liste
  * 
- * ⚠️ Important : La fiche contient le mot de passe en clair
+ * ️ Important : La fiche contient le mot de passe en clair
  * Elle doit être téléchargée et conservée en sécurité
  */
 import { useState, useEffect, useRef } from 'react'
@@ -63,21 +64,21 @@ export default function NewUser() {
     // VALIDATION : Email @comar.tn uniquement
     // ═══════════════════════════════════════════════════════════════
     if (!formData.email.toLowerCase().endsWith('@comar.tn')) {
-      alert('❌ L\'email doit se terminer par @comar.tn\n\nExemple : utilisateur@comar.tn')
+      toast.error(' L\'email doit se terminer par @comar.tn\n\nExemple : utilisateur@comar.tn')
       return
     }
     
     setLoading(true)
 
     try {
-      console.log('📝 Création de l\'utilisateur via Edge Function...', formData)
+      console.log(' Création de l\'utilisateur via Edge Function...', formData)
 
       // ─────────────────────────────────────────────────────────
       // APPEL DE LA EDGE FUNCTION create-user
       // Utilise supabase.functions.invoke() pour une authentification correcte
       // ─────────────────────────────────────────────────────────
       
-      console.log('🔗 Appel de la fonction create-user...')
+      console.log(' Appel de la fonction create-user...')
 
       // Invoquer la fonction avec le SDK Supabase (gère automatiquement l'auth)
       const { data, error } = await supabase.functions.invoke('create-user', {
@@ -89,25 +90,25 @@ export default function NewUser() {
         }
       })
 
-      console.log('📦 Réponse de la fonction:')
+      console.log(' Réponse de la fonction:')
       console.log('  ↳ data:', data)
       console.log('  ↳ error:', error)
       console.log('  ↳ error.message:', error?.message)
       console.log('  ↳ error.context:', error?.context)
 
       if (error) {
-        console.error('❌ Erreur retournée:', error)
+        console.error(' Erreur retournée:', error)
         // Extraire le message d'erreur détaillé si disponible
         const errorDetails = error.context?.body ? ` - ${JSON.stringify(error.context.body)}` : ''
         throw new Error(error.message + errorDetails || 'Erreur lors de la création de l\'utilisateur')
       }
 
       if (!data || !data.success || !data.user) {
-        console.error('❌ Réponse invalide:', data)
+        console.error(' Réponse invalide:', data)
         throw new Error('Réponse invalide de la fonction de création')
       }
 
-      console.log('✅ Utilisateur créé avec succès:', data.user.id)
+      console.log(' Utilisateur créé avec succès:', data.user.id)
       
       // ─────────────────────────────────────────────────────────
       // PRÉPARATION DE LA FICHE UTILISATEUR
@@ -120,7 +121,7 @@ export default function NewUser() {
       const userInfo = {
         id: data.user.id,
         email: formData.email,
-        password: formData.password, // ⚠️ Pour affichage uniquement dans la fiche
+        password: formData.password, // ️ Pour affichage uniquement dans la fiche
         full_name: formData.full_name,
         role_name: selectedRole?.name || 'Non défini',
         role_description: selectedRole?.description || '',
@@ -134,7 +135,7 @@ export default function NewUser() {
       setShowFiche(true)
       
     } catch (error) {
-      console.error('❌ Erreur lors de la création:', error)
+      console.error(' Erreur lors de la création:', error)
       
       let errorMessage = 'Erreur lors de la création de l\'utilisateur'
       
@@ -152,8 +153,8 @@ export default function NewUser() {
         errorMessage = error
       }
       
-      console.error('📢 Message final affiché:', errorMessage)
-      alert('❌ ' + errorMessage)
+      console.error(' Message final affiché:', errorMessage)
+      toast(' ' + errorMessage)
     } finally {
       setLoading(false)
     }
@@ -246,7 +247,7 @@ export default function NewUser() {
               </h1>
               <p className="text-gray-600">Compte créé avec succès</p>
               <div className="mt-4 inline-block bg-green-100 text-green-800 px-4 py-2 rounded-full font-semibold">
-                ✅ Activation réussie
+                 Activation réussie
               </div>
             </div>
 
@@ -285,13 +286,13 @@ export default function NewUser() {
               {/* Mot de passe */}
               <div className="border-l-4 border-red-600 pl-4 bg-red-50 p-4 rounded">
                 <p className="text-sm font-medium text-red-700 uppercase tracking-wider flex items-center gap-2">
-                  <span>🔒</span> Mot de passe temporaire
+                  <span></span> Mot de passe temporaire
                 </p>
                 <p className="text-xl font-mono font-bold text-red-900 mt-2">
                   {createdUser.password}
                 </p>
                 <p className="text-xs text-red-600 mt-2">
-                  ⚠️ <strong>Important :</strong> Conservez ce mot de passe en lieu sûr. 
+                  ️ <strong>Important :</strong> Conservez ce mot de passe en lieu sûr. 
                   Il ne sera plus accessible après fermeture de cette page.
                 </p>
               </div>
@@ -335,7 +336,7 @@ export default function NewUser() {
           {/* Instructions - cachées à l'impression */}
           <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4 print:hidden">
             <p className="text-sm text-blue-800">
-              <strong>📌 Instructions :</strong>
+              <strong> Instructions :</strong>
             </p>
             <ul className="list-disc list-inside text-sm text-blue-700 mt-2 space-y-1">
               <li>Cliquez sur "Télécharger en PDF" pour sauvegarder cette fiche</li>
@@ -443,19 +444,19 @@ export default function NewUser() {
           {/* Message de validation en temps réel */}
           {emailValid === false && (
             <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-              ❌ L'email doit se terminer par <span className="font-mono bg-red-100 px-1 rounded">@comar.tn</span>
+               L'email doit se terminer par <span className="font-mono bg-red-100 px-1 rounded">@comar.tn</span>
             </p>
           )}
           
           {emailValid === true && (
             <p className="mt-1 text-sm text-green-600 flex items-center gap-1">
-              ✅ Format d'email valide
+               Format d'email valide
             </p>
           )}
           
           {emailValid === null && formData.email === '' && (
             <p className="mt-1 text-sm text-gray-600">
-              ⚠️ <strong>Obligatoire :</strong> L'email doit se terminer par <span className="font-mono bg-gray-100 px-1 rounded">@comar.tn</span>
+              ️ <strong>Obligatoire :</strong> L'email doit se terminer par <span className="font-mono bg-gray-100 px-1 rounded">@comar.tn</span>
             </p>
           )}
         </div>
