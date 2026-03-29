@@ -13,7 +13,7 @@ import RCLayout from '../../components/RCLayout'
 /**
  * Page de liste des dossiers – Conformité Cahier des Charges
  *
- * Colonnes : Souscripteur | Police | Date de réception | Demande initiale |
+ * Colonnes : Souscripteur | Police | Date de réception | Type de prestation |
  *            Agence (code + nom) | Niveau dossier | État | Actions (Envoyer / Modifier / Supprimer)
  *
  * Filtres : Souscripteur | État | Date | Numéro Police
@@ -133,6 +133,12 @@ export default function DossiersEnLigneList() {
   })
 
   // ── Helpers d'affichage ───────────────────────────────────────
+  const getTypePrestation = (demande) => {
+    if (!demande) return '-';
+    const match = demande.match(/^\[(.*?)\]/);
+    return match ? match[1] : demande;
+  }
+
   const getNiveauBadge = (n) => {
     const m = { RELATION_CLIENT: 'bg-comar-navy-50 text-comar-navy', PRESTATION: 'bg-emerald-50 text-emerald-700', FINANCE: 'bg-violet-50 text-violet-700' }
     return m[n] || 'bg-gray-100 text-gray-800'
@@ -272,7 +278,7 @@ export default function DossiersEnLigneList() {
                     <th className="px-4 py-3 text-left text-[11px] font-semibold text-white/80 uppercase tracking-wider">Souscripteur</th>
                     <th className="px-4 py-3 text-left text-[11px] font-semibold text-white/80 uppercase tracking-wider">N° Police</th>
                     <th className="px-4 py-3 text-left text-[11px] font-semibold text-white/80 uppercase tracking-wider">Date réception</th>
-                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-white/80 uppercase tracking-wider">Demande initiale</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-white/80 uppercase tracking-wider">Type de prestation</th>
                     <th className="px-4 py-3 text-left text-[11px] font-semibold text-white/80 uppercase tracking-wider">Agence</th>
                     <th className="px-4 py-3 text-left text-[11px] font-semibold text-white/80 uppercase tracking-wider">Niveau</th>
                     <th className="px-4 py-3 text-left text-[11px] font-semibold text-white/80 uppercase tracking-wider">État</th>
@@ -293,7 +299,9 @@ export default function DossiersEnLigneList() {
                             ? new Date(dossier.rc_details.date_reception).toLocaleDateString('fr-FR')
                             : new Date(dossier.created_at).toLocaleDateString('fr-FR')}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{dossier.rc_details?.demande_initiale || '-'}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 font-medium text-comar-navy">
+                          {getTypePrestation(dossier.rc_details?.demande_initiale)}
+                        </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                           {dossier.agences ? dossier.agences.nom : '-'}
                         </td>
