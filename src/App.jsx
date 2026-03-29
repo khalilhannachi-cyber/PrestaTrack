@@ -21,6 +21,8 @@ import AgencesList from './pages/admin/AgencesList'
 import PrestationDashboard from './pages/prestation/PrestationDashboard'
 // Pages Finance
 import FinanceDashboard from './pages/Finance/FinanceDashboard'
+// Page Notifications
+import NotificationsPage from './pages/NotificationsPage'
 
 /**
  * Composant principal de l'application PrestaTrack
@@ -75,6 +77,16 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Route protégée - Notifications globales */}
+          <Route 
+            path="/notifications" 
+            element={
+              <ProtectedRoute>
+                <NotificationsPage />
               </ProtectedRoute>
             } 
           />

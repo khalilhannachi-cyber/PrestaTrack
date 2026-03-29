@@ -51,13 +51,11 @@ export default function AdminLayout({ children }) {
           <div className="flex justify-between items-center h-14">
             {/* Logo */}
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden bg-white p-0.5">
-                <img src={comarLogo} alt="COMAR" className="w-full h-full object-contain" />
+              <div className="bg-white rounded-lg px-2 py-1">
+                <img src={comarLogo} alt="COMAR Assurances" className="h-7 w-auto object-contain" />
               </div>
-              <div>
-                <h1 className="text-sm font-bold text-white leading-tight">PrestaTrack</h1>
-                <p className="text-[10px] text-white/50">Administration</p>
-              </div>
+              <div className="h-6 w-px bg-white/20"></div>
+              <p className="text-xs text-white/60 font-medium">Administration</p>
             </div>
 
             {/* Nav links + actions */}

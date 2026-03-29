@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../contexts/AuthContext'
+import { useNavigate } from 'react-router-dom'
 import { checkStaleDossiers } from '../lib/checkStaleDossiers'
 
 /**
@@ -13,6 +14,7 @@ import { checkStaleDossiers } from '../lib/checkStaleDossiers'
  */
 export default function NotificationBell() {
   const { user, role } = useAuth()
+  const navigate = useNavigate()
   const [notifications, setNotifications] = useState([])
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
@@ -71,6 +73,7 @@ export default function NotificationBell() {
   }
 
   const unreadCount = notifications.filter(n => !n.is_read).length
+  const unreadNotifications = notifications.filter(n => !n.is_read)
 
   return (
     <div className="relative" ref={ref}>
@@ -88,32 +91,41 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-comar-neutral-border z-50 max-h-96 overflow-hidden flex flex-col">
+        <div className="absolute left-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-comar-neutral-border z-50 max-h-96 overflow-hidden flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-comar-neutral-border bg-comar-neutral-bg/50">
             <h3 className="text-sm font-semibold text-comar-navy">Notifications</h3>
-            {unreadCount > 0 && (
-              <button onClick={markAllRead} className="text-xs text-comar-navy hover:text-comar-navy-light font-medium transition-colors">
-                Tout marquer comme lu
+            <div className="flex gap-2">
+              <button onClick={() => { setOpen(false); navigate('/notifications') }} className="text-xs text-comar-blue hover:text-blue-700 font-medium transition-colors border-r pr-2 border-gray-300">
+                Voir tout
               </button>
-            )}
+              {unreadCount > 0 && (
+                <button onClick={markAllRead} className="text-xs text-comar-navy hover:text-comar-navy-light font-medium transition-colors">
+                  Lu
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Liste */}
           <div className="overflow-y-auto flex-1">
-            {notifications.length === 0 ? (
+            {unreadNotifications.length === 0 ? (
               <div className="p-6 text-center text-gray-400 text-sm">
                 <svg className="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>
-                Aucune notification
+                Aucune nouvelle notification
               </div>
             ) : (
-              notifications.map(n => (
+              unreadNotifications.map(n => (
                 <div
                   key={n.id}
-                  onClick={() => { if (!n.is_read) markAsRead(n.id) }}
-                  className={`px-4 py-3 border-b border-comar-neutral-border/50 cursor-pointer hover:bg-comar-navy-50/50 transition-colors duration-150 ${!n.is_read ? 'bg-comar-navy-50 border-l-2 border-l-comar-navy' : ''}`}
+                  onClick={() => { 
+                    markAsRead(n.id);
+                    setOpen(false);
+                    navigate('/notifications');
+                  }}
+                  className="px-4 py-3 border-b border-comar-neutral-border/50 cursor-pointer hover:bg-comar-navy-50/50 transition-colors duration-150 bg-comar-navy-50 border-l-2 border-l-comar-navy"
                 >
-                  <p className={`text-sm ${!n.is_read ? 'font-semibold text-comar-navy' : 'text-gray-600'}`}>
+                  <p className="text-sm font-semibold text-comar-navy">
                     {n.message || n.title || 'Notification'}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">

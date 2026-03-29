@@ -924,9 +924,9 @@ export default function PrestationDashboard() {
                                   ? 'bg-comar-navy text-white hover:bg-comar-navy-light'
                                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               }`}
-                              title={!isNiveauPrestation ? 'Le dossier n\'est plus au niveau PRESTATION' : 'Modifier le dossier'}
+                              title={!isNiveauPrestation ? 'Le dossier n\'est plus au niveau PRESTATION' : 'Traiter le dossier'}
                             >
-                               Modifier
+                               Traiter
                             </button>
                             <button
                               onClick={() => handlePiecesATraiter(dossier)}
@@ -1006,7 +1006,7 @@ export default function PrestationDashboard() {
                 {/* En-tête */}
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-bold text-comar-navy">
-                    Modifier le dossier
+                    Traiter le dossier
                   </h2>
                   <button
                     onClick={closeEditModal}
