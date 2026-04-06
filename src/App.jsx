@@ -10,10 +10,10 @@ import ProtectedRoute from './components/ProtectedRoute'
 import { Toaster } from 'react-hot-toast'
 // Pages Relation Client
 import DossiersList from './pages/rc/DossiersList'
-import DossiersEnLigneList from './pages/rc/DossiersEnLigneList'
 import NewDossier from './pages/rc/NewDossier'
 import DossierDetail from './pages/rc/DossierDetail'
 // Pages Administrateur
+import ServicesMonitoring from './pages/admin/ServicesMonitoring'
 import UsersList from './pages/admin/UsersList'
 import NewUser from './pages/admin/NewUser'
 import AgencesList from './pages/admin/AgencesList'
@@ -118,12 +118,10 @@ function App() {
               path="/rc/dossiers-en-ligne"
               element={
                 <ProtectedRoute allowedRoles={['RELATION_CLIENT']}>
-                  <DossiersEnLigneList />
+                  <Navigate to="/rc/dossiers" replace />
                 </ProtectedRoute>
               }
             />
-            }
-          />
           
           {/* Détail d'un dossier spécifique (avec paramètre :id) */}
           <Route
@@ -138,6 +136,16 @@ function App() {
           {/* ═══════════════════════════════════════════════════════════════ */}
           {/* Routes Administration - Réservées au rôle ADMIN                */}
           {/* ═══════════════════════════════════════════════════════════════ */}
+
+          {/* Monitoring des services (RC / Prestation / Finance) */}
+          <Route
+            path="/admin/monitoring"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <ServicesMonitoring />
+              </ProtectedRoute>
+            }
+          />
           
           {/* Liste de tous les utilisateurs */}
           <Route

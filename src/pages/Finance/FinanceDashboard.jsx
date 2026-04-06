@@ -81,6 +81,8 @@ export default function FinanceDashboard() {
           ),
           dossier_details_rc (
             date_reception,
+            demande_initiale,
+            telephone,
             motif_instance
           )
         `)
@@ -381,6 +383,69 @@ Cette action clôturera définitivement le dossier.`
   }
 
   /**
+   * Formate une date (fallback possible)
+   * @param {string|null|undefined} dateString
+   * @param {string|null|undefined} fallbackDate
+   * @returns {string}
+   */
+  const formatDate = (dateString, fallbackDate = null) => {
+    const value = dateString || fallbackDate
+    if (!value) return '-'
+
+    try {
+      return new Date(value).toLocaleDateString('fr-FR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      })
+    } catch {
+      return '-'
+    }
+  }
+
+  /**
+   * Libellé lisible du niveau
+   * @param {string|null|undefined} niveau
+   * @returns {string}
+   */
+  const getNiveauLabel = (niveau) => {
+    const niveauMap = {
+      RELATION_CLIENT: 'Relation Client',
+      PRESTATION: 'Prestation',
+      FINANCE: 'Finance'
+    }
+
+    return niveauMap[niveau] || niveau || 'N/A'
+  }
+
+  /**
+   * Nettoie l'affichage de la demande initiale (compat legacy)
+   * @param {string|null|undefined} demandeInitiale
+   * @param {string|null|undefined} motifInstance
+   * @returns {string}
+   */
+  const getDemandeInitialeLabel = (demandeInitiale, motifInstance) => {
+    const demande = (demandeInitiale || '').trim()
+    if (!demande) return 'Non renseignée'
+
+    const bracketMatch = demande.match(/^\[(.+?)\]/)
+    if (bracketMatch?.[1]) return bracketMatch[1].trim()
+
+    const motif = (motifInstance || '').trim()
+    if (motif && demande.endsWith(motif)) {
+      const withoutMotif = demande
+        .slice(0, demande.length - motif.length)
+        .trim()
+        .replace(/[-:;,]+$/, '')
+        .trim()
+
+      if (withoutMotif) return withoutMotif
+    }
+
+    return demande
+  }
+
+  /**
    * Retourne un badge JSX pour un champ booléen
    * @param {boolean|null|undefined} value
    * @param {string} labelTrue  - Libellé quand true
@@ -465,6 +530,10 @@ Cette action clôturera définitivement le dossier.`
       </FinanceLayout>
     )
   }
+
+  const modalRcDetails = conformiteDossier?.dossier_details_rc?.[0] || {}
+  const modalPrestationDetails = conformiteDossier?.dossier_details_prestation?.[0] || {}
+  const modalFinanceDetails = conformiteDossier?.dossier_details_finance?.[0] || {}
 
   // ─────────────────────────────────────────────────────────────────
   // Rendu principal
@@ -716,15 +785,21 @@ Cette action clôturera définitivement le dossier.`
       {/* Modal — Vérification de conformité                          */}
       {/* ═══════════════════════════════════════════════════════════ */}
       {isConformiteModalOpen && conformiteDossier && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div
+            className="fixed inset-0 bg-black/50"
+            onClick={!isSaving ? closeConformiteModal : undefined}
+          ></div>
+
+          <div className="relative min-h-full flex items-start justify-center p-4 sm:p-6">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 overflow-y-auto max-h-[calc(100vh-2rem)] my-4">
 
             {/* ── En-tête modal ── */}
             <div className="bg-emerald-600 px-6 py-4 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold text-white"> Vérification de conformité</h2>
                 <p className="text-emerald-100 text-sm mt-0.5">
-                  {conformiteDossier.souscripteur} — {conformiteDossier.police_number || 'N/A'}
+                  {conformiteDossier.souscripteur} — {conformiteDossier.police_number || 'N/A'} · Dossier #{conformiteDossier.id}
                 </p>
               </div>
               <button
@@ -732,21 +807,95 @@ Cette action clôturera définitivement le dossier.`
                 disabled={isSaving}
                 className="text-white hover:text-emerald-200 text-2xl leading-none disabled:opacity-50"
               >
-                
+                ×
               </button>
             </div>
 
+            {/* ── Résumé du dossier ── */}
+            <div className="px-6 pt-5">
+              <div className="bg-comar-neutral-bg rounded-xl p-4 border border-comar-neutral-border">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Date de création</p>
+                    <p className="text-gray-900">{formatDate(conformiteDossier.created_at)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Date de réception</p>
+                    <p className="text-gray-900">{formatDate(modalRcDetails.date_reception, conformiteDossier.created_at)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Agence</p>
+                    <p className="text-gray-900">{conformiteDossier.agences?.nom || 'Non renseignée'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Téléphone</p>
+                    <p className="text-gray-900">{modalRcDetails.telephone || 'Non renseigné'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Niveau</p>
+                    <p className="text-gray-900">{getNiveauLabel(conformiteDossier.niveau)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">État actuel</p>
+                    <div>
+                      <EtatBadge etat={conformiteDossier.etat} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Montant</p>
+                    <p className="text-gray-900 font-semibold">{formatMontant(modalPrestationDetails.montant)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Moyen de paiement enregistré</p>
+                    <p className="text-gray-900">{modalFinanceDetails.moyen_paiement || 'Non renseigné'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Document complet</p>
+                    <div>
+                      <BoolBadge value={modalPrestationDetails.document_complet} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Quittance signée</p>
+                    <div>
+                      <BoolBadge value={modalPrestationDetails.quittance_signee} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Conformité enregistrée</p>
+                    <div>
+                      <BoolBadge value={modalFinanceDetails.conformite_validee} />
+                    </div>
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Demande initiale</p>
+                    <p className="text-gray-900 bg-white border border-comar-neutral-border rounded-lg px-3 py-2">
+                      {getDemandeInitialeLabel(modalRcDetails.demande_initiale, modalRcDetails.motif_instance)}
+                    </p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Motif d'instance</p>
+                    <p className="text-gray-900 bg-white border border-comar-neutral-border rounded-lg px-3 py-2 min-h-[42px]">
+                      {modalRcDetails.motif_instance || 'Non renseigné'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* ── Piece justificative ── */}
-            {conformiteDossier.piece_justificative_url && (
-              <div className="px-6 pt-5">
+            <div className="px-6 pt-5">
+              {conformiteDossier.piece_justificative_url ? (
                 <a href={conformiteDossier.piece_justificative_url} target="_blank" rel="noopener noreferrer" className="inline-flex w-full justify-center items-center gap-2 px-4 py-2 bg-comar-teal-50 text-comar-teal font-medium rounded-xl hover:bg-comar-teal-100 transition-colors">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
                   </svg>
                   Voir la pièce justificative
                 </a>
-              </div>
-            )}
+              ) : (
+                <p className="text-sm text-gray-500 text-center">Aucune pièce justificative jointe à ce dossier.</p>
+              )}
+            </div>
 
             {/* ── Corps du formulaire ── */}
             <div className="px-6 py-5 space-y-5">
@@ -841,6 +990,7 @@ Cette action clôturera définitivement le dossier.`
               </button>
             </div>
 
+            </div>
           </div>
         </div>
       )}

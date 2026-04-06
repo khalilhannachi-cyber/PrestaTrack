@@ -111,7 +111,7 @@ export default function PrestationDashboard() {
           created_at,
           piece_justificative_url,
           agences ( id, nom ),
-          dossier_details_rc ( date_reception, motif_instance )
+          dossier_details_rc ( date_reception, demande_initiale, motif_instance, telephone )
         `)
         .eq('niveau', 'PRESTATION')
         .order('created_at', { ascending: false })
@@ -617,6 +617,11 @@ export default function PrestationDashboard() {
     }
   }
 
+  const formatRequestNumber = (dossier) => {
+    if (dossier?.request_number) return dossier.request_number
+    return `DEM-${String(dossier?.id || '').slice(0, 8).toUpperCase()}`
+  }
+
   /**
    * Formate un montant pour l'affichage
    * @param {number} montant - Montant numérique
@@ -675,6 +680,38 @@ export default function PrestationDashboard() {
         {config.label}
       </span>
     )
+  }
+
+  const getNiveauLabel = (niveau) => {
+    const niveauMap = {
+      RELATION_CLIENT: 'Relation Client',
+      PRESTATION: 'Prestation',
+      FINANCE: 'Finance'
+    }
+
+    return niveauMap[niveau] || niveau || 'N/A'
+  }
+
+  const getDemandeInitialeLabel = (demandeInitiale, motifInstance) => {
+    const demande = (demandeInitiale || '').trim()
+    if (!demande) return 'Non renseignée'
+
+    // Compatibilite legacy: "[Type] motif..." -> afficher uniquement "Type"
+    const bracketMatch = demande.match(/^\[(.+?)\]/)
+    if (bracketMatch?.[1]) return bracketMatch[1].trim()
+
+    const motif = (motifInstance || '').trim()
+    if (motif && demande.endsWith(motif)) {
+      const withoutMotif = demande
+        .slice(0, demande.length - motif.length)
+        .trim()
+        .replace(/[-:;,]+$/, '')
+        .trim()
+
+      if (withoutMotif) return withoutMotif
+    }
+
+    return demande
   }
 
   // Affichage du loader pendant le chargement
@@ -1002,7 +1039,7 @@ export default function PrestationDashboard() {
 
             {/* Modal */}
             <div className="flex items-center justify-center min-h-screen p-4">
-              <div className="relative bg-white rounded-xl shadow-xl max-w-2xl w-full p-6">
+              <div className="relative bg-white rounded-xl shadow-xl max-w-3xl w-full p-6">
                 {/* En-tête */}
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-bold text-comar-navy">
@@ -1018,26 +1055,71 @@ export default function PrestationDashboard() {
 
                 {/* Informations du dossier */}
                 <div className="bg-comar-neutral-bg rounded-xl p-4 mb-6">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
                     <div>
-                      <span className="font-semibold text-gray-700">Souscripteur : </span>
-                      <span className="text-gray-900">{editingDossier.souscripteur}</span>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">N° Dossier</p>
+                      <p className="font-semibold text-comar-navy">{formatRequestNumber(editingDossier)}</p>
                     </div>
                     <div>
-                      <span className="font-semibold text-gray-700">Police : </span>
-                      <span className="text-gray-900 font-mono">{editingDossier.police_number}</span>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Date de création</p>
+                      <p className="text-gray-900">{formatDate(editingDossier.created_at)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Souscripteur</p>
+                      <p className="text-gray-900 font-semibold">{editingDossier.souscripteur || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">N° Police</p>
+                      <p className="text-gray-900 font-mono">{editingDossier.police_number || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Agence</p>
+                      <p className="text-gray-900">{editingDossier.agences?.nom || 'Non renseignée'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Date de réception</p>
+                      <p className="text-gray-900">{formatDate(editingDossier.dossier_details_rc?.[0]?.date_reception, editingDossier.created_at)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Téléphone</p>
+                      <p className="text-gray-900">{editingDossier.dossier_details_rc?.[0]?.telephone || 'Non renseigné'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Niveau</p>
+                      <p className="text-gray-900">{getNiveauLabel(editingDossier.niveau)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">État actuel</p>
+                      <div>{renderEtatBadge(editingDossier.etat)}</div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Document complet</p>
+                      <div>{renderBooleanBadge(editingDossier.dossier_details_prestation?.[0]?.document_complet)}</div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Quittance signée</p>
+                      <div>{renderBooleanBadge(editingDossier.dossier_details_prestation?.[0]?.quittance_signee)}</div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Demande initiale</p>
+                      <p className="text-gray-900 bg-white/70 border border-comar-neutral-border rounded-lg px-3 py-2">
+                        {getDemandeInitialeLabel(editingDossier.dossier_details_rc?.[0]?.demande_initiale, editingDossier.dossier_details_rc?.[0]?.motif_instance)}
+                      </p>
                     </div>
                   </div>
-                  {editingDossier.piece_justificative_url && (
-                    <div className="mt-4 border-t border-gray-200 pt-4">
+
+                  <div className="mt-4 border-t border-gray-200 pt-4">
+                    {editingDossier.piece_justificative_url ? (
                       <a href={editingDossier.piece_justificative_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-comar-teal-50 text-comar-teal font-medium rounded-xl hover:bg-comar-teal-100 transition-colors">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
                         </svg>
                         Voir la pièce
                       </a>
-                    </div>
-                  )}
+                    ) : (
+                      <p className="text-sm text-gray-500">Aucune pièce justificative jointe à ce dossier.</p>
+                    )}
+                  </div>
                 </div>
 
                 {/* Formulaire */}

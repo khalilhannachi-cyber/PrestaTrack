@@ -17,8 +17,8 @@ export default function Dashboard() {
     if (!role) return // Attendre que le rôle soit chargé
     
     if (role === 'ADMIN') {
-      console.log(' [Dashboard] Redirection Admin vers /admin/users')
-      navigate('/admin/users', { replace: true })
+      console.log(' [Dashboard] Redirection Admin vers /admin/monitoring')
+      navigate('/admin/monitoring', { replace: true })
     } else if (role === 'RELATION_CLIENT') {
       console.log(' [Dashboard] Redirection RC vers /rc/dossiers')
       navigate('/rc/dossiers', { replace: true })

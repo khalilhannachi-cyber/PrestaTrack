@@ -10,6 +10,8 @@ import { useAuth } from '../../contexts/AuthContext'
 // Layout spécifique aux pages Relation Client
 import RCLayout from '../../components/RCLayout'
 
+const POLICE_NUMBER_REGEX = /^\d{8}-\d$/
+
 /**
  * Page de création d'un nouveau dossier – Conformité Cahier des Charges
  *
@@ -72,6 +74,12 @@ export default function NewDossier() {
       return
     }
 
+    const normalizedPoliceNumber = formData.police_number.trim()
+    if (!POLICE_NUMBER_REGEX.test(normalizedPoliceNumber)) {
+      toast.error("Format numéro de police invalide. Format attendu: 12345678-9.")
+      return
+    }
+
     if (file && !['application/pdf', 'image/png', 'image/jpeg'].includes(file.type)) {
       toast.error("Format de fichier non autorisé. Seuls PDF, PNG et JPG sont acceptés.");
       return;
@@ -109,7 +117,7 @@ export default function NewDossier() {
         .from('dossiers')
         .insert([{
           souscripteur: formData.souscripteur,
-          police_number: formData.police_number,
+          police_number: normalizedPoliceNumber,
           agence_id: formData.agence_id || null,
           niveau,
           etat: 'EN_COURS',
@@ -206,9 +214,10 @@ export default function NewDossier() {
                 <label htmlFor="police_number" className="block text-sm font-medium text-comar-navy mb-1.5">
                   Numéro de Police <span className="text-comar-red">*</span>
                 </label>
-                <input type="text" id="police_number" name="police_number" value={formData.police_number} onChange={handleChange} required
+                <input type="text" id="police_number" name="police_number" value={formData.police_number} onChange={handleChange} required maxLength={10} pattern="\\d{8}-\\d" title="Format attendu: 12345678-9"
                   className="w-full px-4 py-2.5 border border-comar-neutral-border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all"
-                  placeholder="Ex: POL-2024-12345" />
+                  placeholder="Ex: 12345678-9" />
+                <p className="mt-1 text-xs text-gray-400">Format requis: 8 chiffres, tiret, 1 chiffre</p>
               </div>
 
               {/* Téléphone */}

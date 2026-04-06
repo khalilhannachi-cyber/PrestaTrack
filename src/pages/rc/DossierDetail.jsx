@@ -10,6 +10,8 @@ import { useAuth } from '../../contexts/AuthContext'
 // Layout spécifique aux pages Relation Client
 import RCLayout from '../../components/RCLayout'
 
+const POLICE_NUMBER_REGEX = /^\d{8}-\d$/
+
 /**
  * Page de détail / modification d'un dossier – Conformité Cahier des Charges
  *
@@ -95,13 +97,20 @@ export default function DossierDetail() {
       toast.error("Veuillez remplir tous les champs obligatoires (*).")
       return
     }
+
+    const normalizedPoliceNumber = editForm.police_number.trim()
+    if (!POLICE_NUMBER_REGEX.test(normalizedPoliceNumber)) {
+      toast.error("Format numéro de police invalide. Format attendu: 12345678-9.")
+      return
+    }
+
     setSaving(true)
     try {
       const { error: updateError } = await supabase
         .from('dossiers')
         .update({
           souscripteur: editForm.souscripteur,
-          police_number: editForm.police_number,
+          police_number: normalizedPoliceNumber,
           agence_id: editForm.agence_id || null,
           updated_at: new Date().toISOString()
         })
@@ -327,8 +336,9 @@ export default function DossierDetail() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-comar-navy mb-1.5">N° Police <span className="text-comar-red">*</span></label>
-                <input type="text" name="police_number" value={editForm.police_number} onChange={handleEditChange} required
+                <input type="text" name="police_number" value={editForm.police_number} onChange={handleEditChange} required maxLength={10} pattern="\\d{8}-\\d" title="Format attendu: 12345678-9" placeholder="Ex: 12345678-9"
                   className="w-full px-4 py-2.5 border border-comar-neutral-border rounded-xl focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all" />
+                <p className="mt-1 text-xs text-gray-400">Format requis: 8 chiffres, tiret, 1 chiffre</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-comar-navy mb-1.5">Téléphone</label>

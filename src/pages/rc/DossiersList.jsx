@@ -44,7 +44,6 @@ export default function DossiersList() {
       const { data, error } = await supabase
         .from('dossiers')
         .select(`*, agences ( id, nom, code )`)
-        .eq('created_by', user.id)
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -149,6 +148,28 @@ export default function DossiersList() {
   const getNiveauLabel = (n) => {
     const m = { RELATION_CLIENT: 'Relation Client', PRESTATION: 'Prestation', FINANCE: 'Finance' }
     return m[n] || n || '-'
+  }
+
+  const getDemandeInitialeLabel = (demandeInitiale, motifInstance) => {
+    const demande = (demandeInitiale || '').trim()
+    if (!demande) return '-'
+
+    // Compatibilite legacy: "[Type] motif..." -> afficher uniquement "Type"
+    const bracketMatch = demande.match(/^\[(.+?)\]/)
+    if (bracketMatch?.[1]) return bracketMatch[1].trim()
+
+    const motif = (motifInstance || '').trim()
+    if (motif && demande.endsWith(motif)) {
+      const withoutMotif = demande
+        .slice(0, demande.length - motif.length)
+        .trim()
+        .replace(/[-:;,]+$/, '')
+        .trim()
+
+      if (withoutMotif) return withoutMotif
+    }
+
+    return demande
   }
 
   if (loading) {
@@ -304,7 +325,9 @@ export default function DossiersList() {
                             ? new Date(dossier.rc_details.date_reception).toLocaleDateString('fr-FR')
                             : new Date(dossier.created_at).toLocaleDateString('fr-FR')}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{dossier.rc_details?.demande_initiale || '-'}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                          {getDemandeInitialeLabel(dossier.rc_details?.demande_initiale, dossier.rc_details?.motif_instance)}
+                        </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                           {dossier.agences ? dossier.agences.nom : '-'}
                         </td>
