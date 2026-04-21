@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 // Client Supabase pour les requêtes DB
 import { supabase } from '../../lib/supabaseClient'
+import { formatRequestNumber } from '../../lib/requestNumber'
 // Hook pour accéder au contexte d'authentification
 import { useAuth } from '../../contexts/AuthContext'
 // Layout spécifique aux pages Prestation
@@ -108,12 +109,16 @@ export default function PrestationDashboard() {
           police_number,
           niveau,
           etat,
+          is_urgent,
           created_at,
+          updated_at,
           piece_justificative_url,
-          agences ( id, nom ),
-          dossier_details_rc ( date_reception, motif_instance )
+          agences ( id, nom, code ),
+          dossier_details_rc ( date_reception, motif_instance, demande_initiale, telephone )
         `)
         .eq('niveau', 'PRESTATION')
+        .neq('etat', 'ANNULE')
+        .neq('etat', 'CLOTURE')
         .order('created_at', { ascending: false })
 
       if (fetchError) throw fetchError
@@ -155,6 +160,11 @@ export default function PrestationDashboard() {
    * @param {Object} dossier - Dossier à éditer
    */
   const openEditModal = (dossier) => {
+    if (dossier.etat === 'ANNULE' || dossier.etat === 'CLOTURE') {
+      alert(' Impossible d\'éditer ce dossier : il est clôturé ou annulé.')
+      return
+    }
+
     // Vérification que le niveau est bien PRESTATION
     if (dossier.niveau !== 'PRESTATION') {
       alert(' Impossible d\'éditer ce dossier : il n\'est plus au niveau PRESTATION.')
@@ -360,6 +370,11 @@ export default function PrestationDashboard() {
    * @param {Object} dossier - Dossier à traiter
    */
   const handlePiecesATraiter = async (dossier) => {
+    if (dossier.etat === 'ANNULE' || dossier.etat === 'CLOTURE') {
+      alert(' Ce dossier est clôturé ou annulé et n\'est plus accessible pour le traitement.')
+      return
+    }
+
     // Vérification d'authentification
     if (!user || !user.id) {
       alert(' Votre session a expiré. Veuillez vous reconnecter.')
@@ -494,6 +509,11 @@ export default function PrestationDashboard() {
    * @param {Object} dossier - Dossier à transférer
    */
   const handleTransfertQuittance = async (dossier) => {
+    if (dossier.etat === 'ANNULE' || dossier.etat === 'CLOTURE') {
+      alert(' Ce dossier est clôturé ou annulé et n\'est plus accessible pour le traitement.')
+      return
+    }
+
     // Vérification d'authentification
     if (!user || !user.id) {
       alert(' Votre session a expiré. Veuillez vous reconnecter.')
@@ -635,6 +655,47 @@ export default function PrestationDashboard() {
   }
 
   /**
+   * Libellé lisible du niveau
+   * @param {string} niveau - Niveau du dossier
+   * @returns {string} Libellé affichable
+   */
+  const getNiveauLabel = (niveau) => {
+    const niveauMap = {
+      RELATION_CLIENT: 'Relation Client',
+      PRESTATION: 'Prestation',
+      FINANCE: 'Finance'
+    }
+    return niveauMap[niveau] || niveau || 'N/A'
+  }
+
+  /**
+   * Nettoie l'affichage de la demande initiale (compat legacy)
+   * @param {string} demandeInitiale - Demande brute
+   * @param {string} motifInstance - Motif d'instance
+   * @returns {string} Libellé lisible
+   */
+  const getDemandeInitialeLabel = (demandeInitiale, motifInstance) => {
+    const demande = (demandeInitiale || '').trim()
+    if (!demande) return 'Non renseignée'
+
+    const bracketMatch = demande.match(/^\[(.+?)\]/)
+    if (bracketMatch?.[1]) return bracketMatch[1].trim()
+
+    const motif = (motifInstance || '').trim()
+    if (motif && demande.endsWith(motif)) {
+      const withoutMotif = demande
+        .slice(0, demande.length - motif.length)
+        .trim()
+        .replace(/[-:;,]+$/, '')
+        .trim()
+
+      if (withoutMotif) return withoutMotif
+    }
+
+    return demande
+  }
+
+  /**
    * Affiche un badge Oui/Non stylisé
    * @param {boolean} value - Valeur booléenne
    * @returns {React.ReactNode} Badge stylisé
@@ -715,6 +776,9 @@ export default function PrestationDashboard() {
       </PrestationLayout>
     )
   }
+
+  const editingDetailsRC = editingDossier?.dossier_details_rc?.[0] || {}
+  const editingDetailsPrestation = editingDossier?.dossier_details_prestation?.[0] || {}
 
   return (
     <PrestationLayout>
@@ -857,22 +921,30 @@ export default function PrestationDashboard() {
 
                     // Logique de désactivation des boutons
                     const isNiveauPrestation = dossier.niveau === 'PRESTATION'
+                    const isLocked = dossier.etat === 'ANNULE' || dossier.etat === 'CLOTURE'
                     const isDocumentComplet = detailsPrestation.document_complet === true
                     const isQuittanceSignee = detailsPrestation.quittance_signee === true
 
                     // Désactiver tous les boutons si niveau != PRESTATION
-                    const canEdit = isNiveauPrestation && !isSaving
+                    const canEdit = isNiveauPrestation && !isLocked && !isSaving
                     // "Pièces à traiter" actif uniquement si doc complet et niveau PRESTATION
-                    const canMarkPieces = isNiveauPrestation && isDocumentComplet && !isSaving
+                    const canMarkPieces = isNiveauPrestation && !isLocked && isDocumentComplet && !isSaving
                     // Désactiver "Transfert quittance" si le document n'est pas complet OU quittance_signee = false OU niveau != PRESTATION
-                    const canTransferQuittance = isNiveauPrestation && isDocumentComplet && isQuittanceSignee && !isSaving
+                    const canTransferQuittance = isNiveauPrestation && !isLocked && isDocumentComplet && isQuittanceSignee && !isSaving
 
                     return (
                       <tr key={dossier.id} className="hover:bg-comar-navy-50/30 transition-colors duration-150">
                         {/* Souscripteur */}
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-semibold text-gray-900">
-                            {dossier.souscripteur || 'N/A'}
+                          <div className="flex items-center gap-2">
+                            <div className="text-sm font-semibold text-gray-900">
+                              {dossier.souscripteur || 'N/A'}
+                            </div>
+                            {dossier.is_urgent && (
+                              <span className="px-2 py-0.5 inline-flex text-[11px] font-semibold rounded-full bg-comar-red/10 text-comar-red">
+                                Prioritaire
+                              </span>
+                            )}
                           </div>
                         </td>
                         
@@ -924,7 +996,13 @@ export default function PrestationDashboard() {
                                   ? 'bg-comar-navy text-white hover:bg-comar-navy-light'
                                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               }`}
-                              title={!isNiveauPrestation ? 'Le dossier n\'est plus au niveau PRESTATION' : 'Traiter le dossier'}
+                              title={
+                                !isNiveauPrestation
+                                  ? 'Le dossier n\'est plus au niveau PRESTATION'
+                                  : isLocked
+                                  ? 'Dossier clôturé ou annulé'
+                                  : 'Traiter le dossier'
+                              }
                             >
                                Traiter
                             </button>
@@ -939,6 +1017,8 @@ export default function PrestationDashboard() {
                               title={
                                 !isNiveauPrestation
                                   ? 'Le dossier n\'est plus au niveau PRESTATION'
+                                  : isLocked
+                                  ? 'Dossier clôturé ou annulé'
                                   : !isDocumentComplet
                                   ? 'Le document doit être marqué comme complet'
                                   : 'Marquer les pièces comme à traiter'
@@ -957,6 +1037,8 @@ export default function PrestationDashboard() {
                               title={
                                 !isNiveauPrestation
                                   ? 'Le dossier n\'est plus au niveau PRESTATION'
+                                  : isLocked
+                                  ? 'Dossier clôturé ou annulé'
                                   : !isDocumentComplet
                                   ? 'Le document doit être marqué comme complet'
                                   : !isQuittanceSignee
@@ -1017,15 +1099,74 @@ export default function PrestationDashboard() {
                 </div>
 
                 {/* Informations du dossier */}
-                <div className="bg-comar-neutral-bg rounded-xl p-4 mb-6">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="bg-comar-neutral-bg rounded-xl p-4 mb-6 border border-comar-neutral-border">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
                     <div>
-                      <span className="font-semibold text-gray-700">Souscripteur : </span>
-                      <span className="text-gray-900">{editingDossier.souscripteur}</span>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">N° demande</p>
+                      <p className="text-gray-900 font-semibold">{formatRequestNumber(editingDossier)}</p>
                     </div>
                     <div>
-                      <span className="font-semibold text-gray-700">Police : </span>
-                      <span className="text-gray-900 font-mono">{editingDossier.police_number}</span>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">N° police</p>
+                      <p className="text-gray-900 font-mono">{editingDossier.police_number || 'Non renseigné'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Souscripteur</p>
+                      <p className="text-gray-900">{editingDossier.souscripteur || 'Non renseigné'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Agence</p>
+                      <p className="text-gray-900">
+                        {editingDossier.agences?.nom || 'Non renseignée'}
+                        {editingDossier.agences?.code ? ` (${editingDossier.agences.code})` : ''}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Téléphone</p>
+                      <p className="text-gray-900">{editingDetailsRC.telephone || 'Non renseigné'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Date de réception</p>
+                      <p className="text-gray-900">{formatDate(editingDetailsRC.date_reception, editingDossier.created_at)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Date de création</p>
+                      <p className="text-gray-900">{formatDate(editingDossier.created_at)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Dernière mise à jour</p>
+                      <p className="text-gray-900">{formatDate(editingDossier.updated_at, editingDossier.created_at)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Niveau</p>
+                      <p className="text-gray-900">{getNiveauLabel(editingDossier.niveau)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">État actuel</p>
+                      <div>{renderEtatBadge(editingDossier.etat)}</div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Montant actuel</p>
+                      <p className="text-gray-900 font-semibold">{formatMontant(editingDetailsPrestation.montant)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Document complet</p>
+                      <div>{renderBooleanBadge(editingDetailsPrestation.document_complet)}</div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Quittance signée</p>
+                      <div>{renderBooleanBadge(editingDetailsPrestation.quittance_signee)}</div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Demande initiale</p>
+                      <p className="text-gray-900 leading-relaxed">
+                        {getDemandeInitialeLabel(editingDetailsRC.demande_initiale, editingDetailsRC.motif_instance)}
+                      </p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Motif d'instance actuel</p>
+                      <p className="text-gray-900 leading-relaxed">
+                        {editingDetailsRC.motif_instance || 'Non renseigné'}
+                      </p>
                     </div>
                   </div>
                   {editingDossier.piece_justificative_url && (

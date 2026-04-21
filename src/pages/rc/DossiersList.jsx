@@ -14,9 +14,9 @@ import RCLayout from '../../components/RCLayout'
  * Page de liste des dossiers – Conformité Cahier des Charges
  *
  * Colonnes : Souscripteur | Police | Date de réception | Demande initiale |
- *            Agence (code + nom) | Niveau dossier | État | Actions (Envoyer / Modifier / Supprimer)
+ *            Agence (code + nom) | Niveau dossier | Actions (Envoyer / Modifier / Supprimer)
  *
- * Filtres : Souscripteur | État | Date | Numéro Police
+ * Filtres : Souscripteur | Date | Numéro Police
  */
 export default function DossiersList() {
   const { user } = useAuth()
@@ -24,10 +24,10 @@ export default function DossiersList() {
   const [dossiers, setDossiers] = useState([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(null)
+  const [activeTab, setActiveTab] = useState('actifs')
 
   // ── Filtres ────────────────────────────────────────────────────
   const [filterSouscripteur, setFilterSouscripteur] = useState('')
-  const [filterEtat, setFilterEtat] = useState('')
   const [filterDate, setFilterDate] = useState('')
   const [filterPolice, setFilterPolice] = useState('')
 
@@ -50,15 +50,35 @@ export default function DossiersList() {
 
       const ids = (data || []).map(d => d.id)
       let rcMap = {}
+      const cancelledByHistory = new Set()
       if (ids.length > 0) {
-        const { data: rcData } = await supabase
-          .from('dossier_details_rc')
-          .select('dossier_id, date_reception, demande_initiale, motif_instance, telephone')
-          .in('dossier_id', ids)
+        const [{ data: rcData, error: rcError }, { data: historyData, error: historyError }] = await Promise.all([
+          supabase
+            .from('dossier_details_rc')
+            .select('dossier_id, date_reception, demande_initiale, motif_instance, telephone')
+            .in('dossier_id', ids),
+          supabase
+            .from('historique_actions')
+            .select('dossier_id')
+            .in('dossier_id', ids)
+            .eq('action', 'ANNULATION_DOSSIER')
+        ])
+
+        if (rcError) throw rcError
         if (rcData) rcData.forEach(rc => { rcMap[rc.dossier_id] = rc })
+
+        if (historyError) {
+          console.warn(' [DossiersList] Impossible de lire historique_actions:', historyError.message)
+        } else if (historyData) {
+          historyData.forEach(item => cancelledByHistory.add(item.dossier_id))
+        }
       }
 
-      setDossiers((data || []).map(d => ({ ...d, rc_details: rcMap[d.id] || null })))
+      setDossiers((data || []).map(d => ({
+        ...d,
+        rc_details: rcMap[d.id] || null,
+        is_cancelled: d.etat === 'ANNULE' || cancelledByHistory.has(d.id)
+      })))
     } catch (error) {
       console.error(' [DossiersList] Erreur:', error)
     } finally {
@@ -124,7 +144,6 @@ export default function DossiersList() {
   const filteredDossiers = dossiers.filter(d => {
     if (filterSouscripteur && !d.souscripteur?.toLowerCase().includes(filterSouscripteur.toLowerCase())) return false
     if (filterPolice && !d.police_number?.toLowerCase().includes(filterPolice.toLowerCase())) return false
-    if (filterEtat && d.etat !== filterEtat) return false
     if (filterDate) {
       const dateRec = d.rc_details?.date_reception || d.created_at?.split('T')[0]
       if (!dateRec?.startsWith(filterDate)) return false
@@ -132,18 +151,18 @@ export default function DossiersList() {
     return true
   })
 
+  const dossiersActifs = filteredDossiers.filter(d => d.etat !== 'CLOTURE' && !d.is_cancelled)
+  const dossiersClotures = filteredDossiers.filter(d => d.etat === 'CLOTURE' && !d.is_cancelled)
+  const dossiersAnnules = filteredDossiers.filter(d => d.is_cancelled)
+
+  let displayedDossiers = dossiersActifs
+  if (activeTab === 'clotures') displayedDossiers = dossiersClotures
+  if (activeTab === 'annules') displayedDossiers = dossiersAnnules
+
   // ── Helpers d'affichage ───────────────────────────────────────
   const getNiveauBadge = (n) => {
     const m = { RELATION_CLIENT: 'bg-comar-navy-50 text-comar-navy', PRESTATION: 'bg-emerald-50 text-emerald-700', FINANCE: 'bg-violet-50 text-violet-700' }
     return m[n] || 'bg-gray-100 text-gray-800'
-  }
-  const getEtatBadge = (e) => {
-    const m = { EN_COURS: 'bg-sky-50 text-sky-700', EN_INSTANCE: 'bg-amber-50 text-amber-700', CLOTURE: 'bg-gray-100 text-gray-600' }
-    return m[e] || 'bg-gray-100 text-gray-800'
-  }
-  const getEtatLabel = (e) => {
-    const m = { EN_COURS: 'En cours', EN_INSTANCE: 'En instance', CLOTURE: 'Clôturé' }
-    return m[e] || e || '-'
   }
   const getNiveauLabel = (n) => {
     const m = { RELATION_CLIENT: 'Relation Client', PRESTATION: 'Prestation', FINANCE: 'Finance' }
@@ -195,7 +214,7 @@ export default function DossiersList() {
           <div>
             <h1 className="text-2xl font-bold text-comar-navy">Mes Dossiers</h1>
             <p className="text-sm text-gray-500 mt-1">
-              {filteredDossiers.length} affiché{filteredDossiers.length > 1 ? 's' : ''} sur {dossiers.length}
+              {displayedDossiers.length} affiché{displayedDossiers.length > 1 ? 's' : ''} sur {dossiers.length}
             </p>
           </div>
           <Link
@@ -224,7 +243,7 @@ export default function DossiersList() {
             </div>
             <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
               <div className="flex items-center justify-between">
-                <div><p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Clôturés</p><p className="text-2xl font-bold text-gray-600 mt-1">{dossiers.filter(d => d.etat === 'CLOTURE').length}</p></div>
+                <div><p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Clôturés</p><p className="text-2xl font-bold text-gray-600 mt-1">{dossiers.filter(d => d.etat === 'CLOTURE' && !d.is_cancelled).length}</p></div>
                 <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center"><svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
               </div>
             </div>
@@ -243,21 +262,11 @@ export default function DossiersList() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" /></svg>
             Filtres
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Souscripteur</label>
               <input type="text" value={filterSouscripteur} onChange={(e) => setFilterSouscripteur(e.target.value)}
                 placeholder="Rechercher..." className="w-full px-3 py-2 border border-comar-neutral-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">État</label>
-              <select value={filterEtat} onChange={(e) => setFilterEtat(e.target.value)}
-                className="w-full px-3 py-2 border border-comar-neutral-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all">
-                <option value="">Tous</option>
-                <option value="EN_COURS">En cours</option>
-                <option value="EN_INSTANCE">En instance</option>
-                <option value="CLOTURE">Clôturé</option>
-              </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Date de réception</label>
@@ -270,13 +279,47 @@ export default function DossiersList() {
                 placeholder="Rechercher..." className="w-full px-3 py-2 border border-comar-neutral-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all" />
             </div>
           </div>
-          {(filterSouscripteur || filterEtat || filterDate || filterPolice) && (
-            <button onClick={() => { setFilterSouscripteur(''); setFilterEtat(''); setFilterDate(''); setFilterPolice('') }}
+          {(filterSouscripteur || filterDate || filterPolice) && (
+            <button onClick={() => { setFilterSouscripteur(''); setFilterDate(''); setFilterPolice('') }}
               className="mt-3 text-xs text-comar-navy hover:text-comar-red font-medium transition-colors flex items-center gap-1 cursor-pointer">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               Réinitialiser les filtres
             </button>
           )}
+        </div>
+
+        {/* Onglets dossiers */}
+        <div className="mb-4 flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab('actifs')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+              activeTab === 'actifs'
+                ? 'bg-comar-navy text-white'
+                : 'bg-white border border-comar-neutral-border text-comar-navy hover:bg-comar-navy-50'
+            }`}
+          >
+            Dossiers actifs ({dossiersActifs.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('clotures')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+              activeTab === 'clotures'
+                ? 'bg-comar-navy text-white'
+                : 'bg-white border border-comar-neutral-border text-comar-navy hover:bg-comar-navy-50'
+            }`}
+          >
+            Dossiers clôturés ({dossiersClotures.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('annules')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+              activeTab === 'annules'
+                ? 'bg-comar-navy text-white'
+                : 'bg-white border border-comar-neutral-border text-comar-navy hover:bg-comar-navy-50'
+            }`}
+          >
+            Dossiers annulés ({dossiersAnnules.length})
+          </button>
         </div>
 
         {/* Contenu */}
@@ -295,6 +338,18 @@ export default function DossiersList() {
             <h3 className="text-lg font-semibold text-comar-navy mb-2">Aucun résultat</h3>
             <p className="text-sm text-gray-500">Aucun dossier ne correspond aux filtres appliqués.</p>
           </div>
+        ) : displayedDossiers.length === 0 ? (
+          <div className="bg-white rounded-xl border border-comar-neutral-border p-12 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-comar-neutral-bg flex items-center justify-center mx-auto mb-4"><svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m5.25 2.25a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
+            <h3 className="text-lg font-semibold text-comar-navy mb-2">Aucun dossier dans cet onglet</h3>
+            <p className="text-sm text-gray-500">
+              {activeTab === 'clotures'
+                ? 'Aucun dossier clôturé pour le moment.'
+                : activeTab === 'annules'
+                ? 'Aucun dossier annulé pour le moment.'
+                : 'Aucun dossier actif pour le moment.'}
+            </p>
+          </div>
         ) : (
           <div className="bg-white rounded-xl border border-comar-neutral-border overflow-hidden">
             <div className="overflow-x-auto">
@@ -307,18 +362,30 @@ export default function DossiersList() {
                     <th className="px-4 py-3 text-left text-[11px] font-semibold text-white/80 uppercase tracking-wider">Demande initiale</th>
                     <th className="px-4 py-3 text-left text-[11px] font-semibold text-white/80 uppercase tracking-wider">Agence</th>
                     <th className="px-4 py-3 text-left text-[11px] font-semibold text-white/80 uppercase tracking-wider">Niveau</th>
-                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-white/80 uppercase tracking-wider">État</th>
                     <th className="px-4 py-3 text-left text-[11px] font-semibold text-white/80 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-comar-neutral-border">
-                  {filteredDossiers.map((dossier) => {
+                  {displayedDossiers.map((dossier) => {
                     const isRC = dossier.niveau === 'RELATION_CLIENT'
+                    const isCancelled = dossier.is_cancelled === true
+                    const isCloture = dossier.etat === 'CLOTURE' && !isCancelled
+                    const isLocked = isCloture || isCancelled
                     const isBusy = actionLoading === dossier.id
+                    const canManage = isRC && !isLocked && !isBusy
 
                     return (
                       <tr key={dossier.id} className="hover:bg-comar-navy-50/30 transition-colors duration-150">
-                        <td className="px-4 py-3 whitespace-nowrap"><div className="text-sm font-semibold text-comar-navy">{dossier.souscripteur || 'N/A'}</div></td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <div className="text-sm font-semibold text-comar-navy">{dossier.souscripteur || 'N/A'}</div>
+                            {dossier.is_urgent && (
+                              <span className="px-2 py-0.5 inline-flex text-[11px] font-semibold rounded-full bg-comar-red/10 text-comar-red">
+                                Prioritaire
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 font-mono">{dossier.police_number || '-'}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                           {dossier.rc_details?.date_reception
@@ -337,26 +404,45 @@ export default function DossiersList() {
                           </span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className={`px-2.5 py-1 inline-flex text-[11px] leading-5 font-semibold rounded-lg ${getEtatBadge(dossier.etat)}`}>
-                            {getEtatLabel(dossier.etat)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center gap-1.5">
-                            <button onClick={() => handleEnvoyer(dossier)} disabled={!isRC || isBusy}
-                              title={isRC ? 'Envoyer au service Prestation' : 'Dossier déjà transmis'}
+                            <button onClick={() => handleEnvoyer(dossier)} disabled={!canManage}
+                              title={
+                                !isRC
+                                  ? 'Dossier déjà transmis'
+                                  : isCancelled
+                                  ? 'Dossier annulé: action indisponible'
+                                  : isCloture
+                                  ? 'Dossier clôturé: action indisponible'
+                                  : 'Envoyer au service Prestation'
+                              }
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 text-white text-[11px] font-semibold rounded-lg hover:bg-emerald-700 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed">
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
                               Envoyer
                             </button>
-                            <button onClick={() => navigate(`/rc/dossiers/${dossier.id}`)} disabled={!isRC || isBusy}
-                              title={isRC ? 'Modifier le dossier' : 'Modification impossible'}
+                            <button onClick={() => navigate(`/rc/dossiers/${dossier.id}`)} disabled={!canManage}
+                              title={
+                                !isRC
+                                  ? 'Modification impossible'
+                                  : isCancelled
+                                  ? 'Dossier annulé: modification indisponible'
+                                  : isCloture
+                                  ? 'Dossier clôturé: modification indisponible'
+                                  : 'Modifier le dossier'
+                              }
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-comar-navy text-white text-[11px] font-semibold rounded-lg hover:bg-comar-navy-light transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed">
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" /></svg>
                               Modifier
                             </button>
-                            <button onClick={() => handleSupprimer(dossier)} disabled={!isRC || isBusy}
-                              title={isRC ? 'Supprimer le dossier' : 'Suppression impossible'}
+                            <button onClick={() => handleSupprimer(dossier)} disabled={!canManage}
+                              title={
+                                !isRC
+                                  ? 'Suppression impossible'
+                                  : isCancelled
+                                  ? 'Dossier annulé: suppression indisponible'
+                                  : isCloture
+                                  ? 'Dossier clôturé: suppression indisponible'
+                                  : 'Supprimer le dossier'
+                              }
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-comar-red text-white text-[11px] font-semibold rounded-lg hover:bg-comar-red-light transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed">
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
                               Supprimer

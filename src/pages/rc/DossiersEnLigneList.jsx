@@ -144,11 +144,11 @@ export default function DossiersEnLigneList() {
     return m[n] || 'bg-gray-100 text-gray-800'
   }
   const getEtatBadge = (e) => {
-    const m = { EN_COURS: 'bg-sky-50 text-sky-700', EN_INSTANCE: 'bg-amber-50 text-amber-700', CLOTURE: 'bg-gray-100 text-gray-600' }
+    const m = { EN_COURS: 'bg-sky-50 text-sky-700', EN_INSTANCE: 'bg-amber-50 text-amber-700', CLOTURE: 'bg-gray-100 text-gray-600', ANNULE: 'bg-red-50 text-red-700' }
     return m[e] || 'bg-gray-100 text-gray-800'
   }
   const getEtatLabel = (e) => {
-    const m = { EN_COURS: 'En cours', EN_INSTANCE: 'En instance', CLOTURE: 'Clôturé' }
+    const m = { EN_COURS: 'En cours', EN_INSTANCE: 'En instance', CLOTURE: 'Clôturé', ANNULE: 'Annulé' }
     return m[e] || e || '-'
   }
   const getNiveauLabel = (n) => {
@@ -234,6 +234,7 @@ export default function DossiersEnLigneList() {
                 <option value="EN_COURS">En cours</option>
                 <option value="EN_INSTANCE">En instance</option>
                 <option value="CLOTURE">Clôturé</option>
+                <option value="ANNULE">Annulé</option>
               </select>
             </div>
             <div>

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 // Client Supabase pour les requêtes DB
 import { supabase } from '../../lib/supabaseClient'
+import { buildRequestNumberFromId } from '../../lib/requestNumber'
 // Hook pour accéder au contexte d'authentification
 import { useAuth } from '../../contexts/AuthContext'
 // Layout spécifique aux pages Relation Client
@@ -130,6 +131,7 @@ export default function NewDossier() {
       if (!dossierData || dossierData.length === 0) throw new Error('Aucune donnée retournée')
 
       const dossierId = dossierData[0].id
+      const requestNumber = buildRequestNumberFromId(dossierId)
 
       // ÉTAPE 2 : Insertion dans 'dossier_details_rc'
       const { error: detailsError } = await supabase
@@ -153,14 +155,14 @@ export default function NewDossier() {
         dossier_id: dossierId,
         user_id: user.id,
         action: actionLabel,
-        description: `Dossier créé pour ${formData.souscripteur}`,
+        description: `Dossier ${requestNumber} créé pour ${formData.souscripteur}`,
         old_status: null,
         new_status: niveau
       }])
 
       const msg = niveau === 'PRESTATION'
-        ? ' Dossier créé et envoyé au service Prestation !'
-        : ' Dossier enregistré avec succès !'
+        ? `Dossier ${requestNumber} créé et envoyé au service Prestation !`
+        : `Dossier ${requestNumber} enregistré avec succès !`
       toast(msg)
       navigate('/rc/dossiers')
     } catch (error) {

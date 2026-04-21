@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'react-hot-toast'
 import AdminLayout from '../../components/AdminLayout'
 import { useAuth } from '../../contexts/AuthContext'
@@ -10,6 +10,8 @@ const DEFAULT_SLA_THRESHOLDS = {
   FINANCE: 3,
 }
 
+const SLA_STORAGE_KEY = 'admin_sla_thresholds_v1'
+
 const ACTION_HISTORY_DAYS = 180
 
 const SERVICE_FILTERS = [
@@ -19,13 +21,9 @@ const SERVICE_FILTERS = [
   { key: 'FINANCE', label: 'Finance' },
 ]
 
-const PERIOD_PRESETS = [
-  { key: 'TODAY', label: "Aujourd'hui" },
-  { key: '7D', label: '7 derniers jours' },
-  { key: '30D', label: '30 derniers jours' },
-  { key: 'CUSTOM', label: 'Période personnalisée' },
-  { key: 'ALL', label: 'Toutes périodes' },
-]
+const CANCELLATION_HELP_TEXT = 'Pour toute assistance, merci de contacter votre agence COMAR ou notre service support.'
+const CANCELLED_STATUS = 'ANNULE'
+const CANCELLED_STATUS_FALLBACK = 'CLOTURE'
 
 const TREND_MODES = [
   { key: 'DAY', label: 'Tendance vs hier' },
@@ -50,10 +48,34 @@ function clampThreshold(value) {
   return Math.max(1, Math.min(30, parsed))
 }
 
-function buildPeriodFromPreset(preset, customStartDate, customEndDate) {
-  const now = new Date()
+function readStoredSlaThresholds() {
+  try {
+    if (typeof window === 'undefined') {
+      return DEFAULT_SLA_THRESHOLDS
+    }
 
-  if (preset === 'ALL') {
+    const stored = window.localStorage.getItem(SLA_STORAGE_KEY)
+    if (!stored) {
+      return DEFAULT_SLA_THRESHOLDS
+    }
+
+    const parsed = JSON.parse(stored)
+    return {
+      RELATION_CLIENT: clampThreshold(parsed.RELATION_CLIENT ?? DEFAULT_SLA_THRESHOLDS.RELATION_CLIENT),
+      PRESTATION: clampThreshold(parsed.PRESTATION ?? DEFAULT_SLA_THRESHOLDS.PRESTATION),
+      FINANCE: clampThreshold(parsed.FINANCE ?? DEFAULT_SLA_THRESHOLDS.FINANCE),
+    }
+  } catch (storageError) {
+    console.warn('[ServicesMonitoring] Impossible de charger les SLA locaux:', storageError)
+    return DEFAULT_SLA_THRESHOLDS
+  }
+}
+
+function buildPeriodFromDates(customStartDate, customEndDate) {
+  const hasStart = Boolean(customStartDate)
+  const hasEnd = Boolean(customEndDate)
+
+  if (!hasStart && !hasEnd) {
     return {
       key: 'ALL',
       start: null,
@@ -63,68 +85,46 @@ function buildPeriodFromPreset(preset, customStartDate, customEndDate) {
     }
   }
 
-  if (preset === 'TODAY') {
+  const start = hasStart ? startOfDay(new Date(customStartDate)) : null
+  const end = hasEnd ? endOfDay(new Date(customEndDate)) : null
+
+  if ((start && Number.isNaN(start.getTime())) || (end && Number.isNaN(end.getTime())) || (start && end && start > end)) {
     return {
-      key: 'TODAY',
-      start: startOfDay(now),
-      end: now,
-      isValid: true,
-      label: "Aujourd'hui",
+      key: 'CUSTOM',
+      start: null,
+      end: null,
+      isValid: false,
+      label: 'Intervalle de dates invalide',
     }
   }
 
-  if (preset === '7D') {
-    const start = startOfDay(new Date(now.getTime() - (6 * 24 * 60 * 60 * 1000)))
-    return {
-      key: '7D',
-      start,
-      end: now,
-      isValid: true,
-      label: '7 derniers jours',
-    }
-  }
-
-  if (preset === '30D') {
-    const start = startOfDay(new Date(now.getTime() - (29 * 24 * 60 * 60 * 1000)))
-    return {
-      key: '30D',
-      start,
-      end: now,
-      isValid: true,
-      label: '30 derniers jours',
-    }
-  }
-
-  if (preset === 'CUSTOM') {
-    if (!customStartDate || !customEndDate) {
-      return {
-        key: 'CUSTOM',
-        start: null,
-        end: null,
-        isValid: false,
-        label: 'Période personnalisée incomplète',
-      }
-    }
-
-    const start = startOfDay(new Date(customStartDate))
-    const end = endOfDay(new Date(customEndDate))
-
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
-      return {
-        key: 'CUSTOM',
-        start: null,
-        end: null,
-        isValid: false,
-        label: 'Période personnalisée invalide',
-      }
-    }
-
+  if (start && end) {
     return {
       key: 'CUSTOM',
       start,
       end,
       isValid: true,
       label: `Du ${start.toLocaleDateString('fr-FR')} au ${end.toLocaleDateString('fr-FR')}`,
+    }
+  }
+
+  if (start) {
+    return {
+      key: 'CUSTOM',
+      start,
+      end: null,
+      isValid: true,
+      label: `Depuis le ${start.toLocaleDateString('fr-FR')}`,
+    }
+  }
+
+  if (end) {
+    return {
+      key: 'CUSTOM',
+      start: null,
+      end,
+      isValid: true,
+      label: `Jusqu'au ${end.toLocaleDateString('fr-FR')}`,
     }
   }
 
@@ -256,31 +256,26 @@ function formatDate(value) {
   }
 }
 
-function escapeCsvValue(value) {
-  const text = String(value ?? '')
-  const escaped = text.replace(/"/g, '""')
-  return `"${escaped}"`
+function buildCancellationMessages(reference, reasonText) {
+  const baseClient = `Nous vous prions de nous excuser: votre dossier ${reference} a été annulé par l'administration.`
+  const baseService = `Annulation administrative du dossier ${reference}.`
+
+  if (reasonText) {
+    return {
+      clientMessage: `${baseClient} Motif: ${reasonText}. ${CANCELLATION_HELP_TEXT}`,
+      serviceMessage: `${baseService} Motif: ${reasonText}.`,
+    }
+  }
+
+  return {
+    clientMessage: `${baseClient} ${CANCELLATION_HELP_TEXT}`,
+    serviceMessage: `${baseService}`,
+  }
 }
 
-function buildCsv(headers, rows) {
-  const headerLine = headers.map((header) => escapeCsvValue(header.label)).join(',')
-  const bodyLines = rows.map((row) => {
-    return headers.map((header) => escapeCsvValue(row[header.key])).join(',')
-  })
-
-  return [headerLine, ...bodyLines].join('\n')
-}
-
-function downloadCsvFile(filename, csvContent) {
-  const blob = new Blob([`\ufeff${csvContent}`], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  document.body.appendChild(anchor)
-  anchor.click()
-  document.body.removeChild(anchor)
-  URL.revokeObjectURL(url)
+function isEtatCheckConstraintError(error) {
+  const message = String(error?.message || '').toLowerCase()
+  return message.includes('dossiers_etat_check') || message.includes('violates check constraint')
 }
 
 function buildTrendDescriptor(delta, label, options = {}) {
@@ -350,40 +345,54 @@ export default function ServicesMonitoring() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState(null)
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(null)
 
   const [serviceFilter, setServiceFilter] = useState('ALL')
   const [agencyFilter, setAgencyFilter] = useState('ALL')
-  const [periodPreset, setPeriodPreset] = useState('7D')
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
   const [trendMode, setTrendMode] = useState('DAY')
 
   const [actionBusy, setActionBusy] = useState({})
-  const [exporting, setExporting] = useState(false)
+  const [openedDossierId, setOpenedDossierId] = useState(null)
 
-  const [slaThresholds, setSlaThresholds] = useState(DEFAULT_SLA_THRESHOLDS)
+  const [slaThresholds, setSlaThresholds] = useState(() => readStoredSlaThresholds())
+  const [slaDraftThresholds, setSlaDraftThresholds] = useState(() => readStoredSlaThresholds())
+  const [isEditingSla, setIsEditingSla] = useState(false)
+
+  useEffect(() => {
+    if (!isEditingSla) {
+      setSlaDraftThresholds(slaThresholds)
+    }
+  }, [isEditingSla, slaThresholds])
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('admin_sla_thresholds_v1')
-      if (!stored) return
-
-      const parsed = JSON.parse(stored)
-      setSlaThresholds((prev) => ({
-        RELATION_CLIENT: clampThreshold(parsed.RELATION_CLIENT ?? prev.RELATION_CLIENT),
-        PRESTATION: clampThreshold(parsed.PRESTATION ?? prev.PRESTATION),
-        FINANCE: clampThreshold(parsed.FINANCE ?? prev.FINANCE),
-      }))
+      localStorage.setItem(SLA_STORAGE_KEY, JSON.stringify(slaThresholds))
     } catch (storageError) {
-      console.warn('[ServicesMonitoring] Impossible de charger les SLA locaux:', storageError)
+      console.warn('[ServicesMonitoring] Impossible de sauvegarder les SLA locaux:', storageError)
     }
-  }, [])
-
-  useEffect(() => {
-    localStorage.setItem('admin_sla_thresholds_v1', JSON.stringify(slaThresholds))
   }, [slaThresholds])
 
-  const fetchDashboardData = async ({ silent = false } = {}) => {
+  const hasPendingSlaChanges =
+    slaDraftThresholds.RELATION_CLIENT !== slaThresholds.RELATION_CLIENT ||
+    slaDraftThresholds.PRESTATION !== slaThresholds.PRESTATION ||
+    slaDraftThresholds.FINANCE !== slaThresholds.FINANCE
+
+  const hasActiveFilters =
+    agencyFilter !== 'ALL' ||
+    serviceFilter !== 'ALL' ||
+    Boolean(customStartDate) ||
+    Boolean(customEndDate)
+
+  const handleResetFilters = useCallback(() => {
+    setAgencyFilter('ALL')
+    setServiceFilter('ALL')
+    setCustomStartDate('')
+    setCustomEndDate('')
+  }, [])
+
+  const fetchDashboardData = useCallback(async ({ silent = false } = {}) => {
     try {
       if (silent) {
         setRefreshing(true)
@@ -417,6 +426,7 @@ export default function ServicesMonitoring() {
         setPrestationDetails([])
         setFinanceDetails([])
         setActionHistory([])
+        setLastUpdatedAt(new Date().toISOString())
         return
       }
 
@@ -454,6 +464,7 @@ export default function ServicesMonitoring() {
       setPrestationDetails(prestationResult.data || [])
       setFinanceDetails(financeResult.data || [])
       setActionHistory(actionResult.data || [])
+      setLastUpdatedAt(new Date().toISOString())
     } catch (err) {
       console.error('[ServicesMonitoring] Erreur de chargement:', err)
       setError(err.message || 'Erreur inconnue pendant le chargement du dashboard admin.')
@@ -464,12 +475,64 @@ export default function ServicesMonitoring() {
         setLoading(false)
       }
     }
-  }
+  }, [])
 
   useEffect(() => {
     fetchDashboardData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [fetchDashboardData])
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchDashboardData({ silent: true })
+    }, 60 * 1000)
+
+    return () => {
+      clearInterval(intervalId)
+    }
+  }, [fetchDashboardData])
+
+  useEffect(() => {
+    let refreshTimer = null
+
+    const scheduleSilentRefresh = () => {
+      if (refreshTimer) return
+
+      refreshTimer = setTimeout(() => {
+        refreshTimer = null
+        fetchDashboardData({ silent: true })
+      }, 800)
+    }
+
+    const channel = supabase
+      .channel('admin-services-monitoring-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dossiers' }, scheduleSilentRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dossier_details_prestation' }, scheduleSilentRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dossier_details_finance' }, scheduleSilentRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'historique_actions' }, scheduleSilentRefresh)
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          console.warn('[ServicesMonitoring] Realtime indisponible, fallback sur auto-refresh.')
+        }
+      })
+
+    return () => {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer)
+        refreshTimer = null
+      }
+      supabase.removeChannel(channel)
+    }
+  }, [fetchDashboardData])
+
+  const formattedLastUpdate = useMemo(() => {
+    if (!lastUpdatedAt) return 'En attente de synchronisation...'
+
+    try {
+      return `Mis a jour le ${new Date(lastUpdatedAt).toLocaleString('fr-FR')}`
+    } catch {
+      return 'Mis a jour recemment'
+    }
+  }, [lastUpdatedAt])
 
   const prestationByDossier = useMemo(() => {
     const map = {}
@@ -495,7 +558,7 @@ export default function ServicesMonitoring() {
       const threshold = Number(slaThresholds[service] || DEFAULT_SLA_THRESHOLDS[service] || 3)
       const lastDate = finance.date_paiement || dossier.updated_at || dossier.created_at
       const staleDays = daysSinceDate(lastDate)
-      const isActive = dossier.etat !== 'CLOTURE'
+      const isActive = dossier.etat !== 'CLOTURE' && dossier.etat !== 'ANNULE'
 
       return {
         ...dossier,
@@ -525,6 +588,11 @@ export default function ServicesMonitoring() {
     return rows
   }, [dossiers, prestationByDossier, financeByDossier, slaThresholds])
 
+  const openedDossier = useMemo(() => {
+    if (!openedDossierId) return null
+    return allRows.find((row) => row.id === openedDossierId) || null
+  }, [allRows, openedDossierId])
+
   const agencyOptions = useMemo(() => {
     const map = new Map()
 
@@ -546,8 +614,8 @@ export default function ServicesMonitoring() {
   }, [agencyFilter, agencyOptions])
 
   const selectedPeriod = useMemo(() => {
-    return buildPeriodFromPreset(periodPreset, customStartDate, customEndDate)
-  }, [periodPreset, customStartDate, customEndDate])
+    return buildPeriodFromDates(customStartDate, customEndDate)
+  }, [customStartDate, customEndDate])
 
   const effectivePeriod = useMemo(() => {
     if (selectedPeriod.isValid) {
@@ -773,8 +841,11 @@ export default function ServicesMonitoring() {
     })
   }
 
-  const logAdminAction = async (row, action, description) => {
+  const logAdminAction = async (row, action, description, statusTransition = {}) => {
     if (!user?.id) return
+
+    const oldStatus = statusTransition.oldStatus ?? row.etat
+    const newStatus = statusTransition.newStatus ?? row.etat
 
     try {
       await supabase
@@ -785,69 +856,12 @@ export default function ServicesMonitoring() {
             user_id: user.id,
             action,
             description,
-            old_status: row.etat,
-            new_status: row.etat,
+            old_status: oldStatus,
+            new_status: newStatus,
           }
         ])
     } catch (logError) {
       console.warn('[ServicesMonitoring] Impossible de logger action admin:', logError)
-    }
-  }
-
-  const handleSendAlert = async (row, mode = 'RELANCE_ADMIN') => {
-    const busyLabel = mode === 'ESCALADE_ADMIN' ? 'ESCALADE' : 'RELANCE'
-    setRowBusy(row.id, busyLabel)
-
-    try {
-      const serviceRoles = getServiceRoles(row.service)
-      const targetRoles = mode === 'ESCALADE_ADMIN'
-        ? Array.from(new Set([...serviceRoles, 'ADMIN']))
-        : serviceRoles
-
-      if (targetRoles.length === 0) {
-        toast.error('Aucun destinataire trouvé pour ce service.')
-        return
-      }
-
-      const { data: recipients, error: recipientsError } = await supabase
-        .from('users')
-        .select('id, roles!inner(name)')
-        .in('roles.name', targetRoles)
-
-      if (recipientsError) throw recipientsError
-
-      const recipientIds = Array.from(new Set((recipients || []).map((item) => item.id).filter(Boolean)))
-      if (recipientIds.length === 0) {
-        toast.error('Aucun utilisateur actif à notifier pour cette relance.')
-        return
-      }
-
-      const title = mode === 'ESCALADE_ADMIN' ? 'Escalade admin' : 'Relance admin'
-      const message = `${title}: dossier ${row.police_number || row.id} bloqué depuis ${row.staleDays} jours au service ${row.serviceLabel}.`
-
-      const notifications = recipientIds.map((recipientId) => ({
-        user_id: recipientId,
-        dossier_id: row.id,
-        type: mode,
-        message,
-        is_read: false,
-        created_at: new Date().toISOString(),
-      }))
-
-      const { error: notifyError } = await supabase
-        .from('notifications')
-        .insert(notifications)
-
-      if (notifyError) throw notifyError
-
-      await logAdminAction(row, mode, message)
-
-      toast.success(`${title} envoyée à ${recipientIds.length} utilisateur(s).`)
-    } catch (err) {
-      console.error('[ServicesMonitoring] Erreur alerte admin:', err)
-      toast.error(`Erreur alerte: ${err.message}`)
-    } finally {
-      clearRowBusy(row.id)
     }
   }
 
@@ -889,124 +903,201 @@ export default function ServicesMonitoring() {
     }
   }
 
+  const handleRemoveUrgent = async (row) => {
+    setRowBusy(row.id, 'UNURGENT')
+
+    try {
+      const nowIso = new Date().toISOString()
+
+      const { error: updateError } = await supabase
+        .from('dossiers')
+        .update({ is_urgent: false, updated_at: nowIso })
+        .eq('id', row.id)
+
+      if (updateError) throw updateError
+
+      setDossiers((prev) => {
+        return prev.map((item) => {
+          if (item.id !== row.id) return item
+          return { ...item, is_urgent: false, updated_at: nowIso }
+        })
+      })
+
+      await logAdminAction(
+        row,
+        'RETIRER_URGENT',
+        `Priorité retirée du dossier ${row.police_number || row.id} par un administrateur.`
+      )
+
+      toast.success('Priorité retirée du dossier.')
+    } catch (err) {
+      console.error('[ServicesMonitoring] Erreur retrait priorité:', err)
+
+      if (String(err.message || '').toLowerCase().includes('is_urgent')) {
+        toast.error("La colonne is_urgent n'existe pas encore en base. Lance la migration SQL.")
+      } else {
+        toast.error(`Erreur priorité: ${err.message}`)
+      }
+    } finally {
+      clearRowBusy(row.id)
+    }
+  }
+
+  const handleCancelDossier = async (row) => {
+    const confirmed = window.confirm(`Confirmer l'annulation du dossier ${row.police_number || row.id} ?`)
+    if (!confirmed) return
+
+    const reason = window.prompt("Motif d'annulation (optionnel):", '')
+    if (reason === null) return
+
+    setRowBusy(row.id, 'ANNULATION')
+
+    try {
+      const nowIso = new Date().toISOString()
+      const reasonText = reason.trim()
+      const reference = row.police_number || row.id
+      const { clientMessage, serviceMessage } = buildCancellationMessages(reference, reasonText)
+
+      let persistedStatus = CANCELLED_STATUS
+      let usedFallbackStatus = false
+
+      let { error: updateError } = await supabase
+        .from('dossiers')
+        .update({
+          etat: persistedStatus,
+          is_urgent: false,
+          updated_at: nowIso,
+        })
+        .eq('id', row.id)
+
+      if (updateError && isEtatCheckConstraintError(updateError)) {
+        persistedStatus = CANCELLED_STATUS_FALLBACK
+        usedFallbackStatus = true
+
+        const retryResult = await supabase
+          .from('dossiers')
+          .update({
+            etat: persistedStatus,
+            is_urgent: false,
+            updated_at: nowIso,
+          })
+          .eq('id', row.id)
+
+        updateError = retryResult.error
+      }
+
+      if (updateError) throw updateError
+
+      setDossiers((prev) => {
+        return prev.map((item) => {
+          if (item.id !== row.id) return item
+          return {
+            ...item,
+            etat: persistedStatus,
+            is_urgent: false,
+            updated_at: nowIso,
+          }
+        })
+      })
+
+      let notifiedUsersCount = 0
+      const serviceRoles = getServiceRoles(row.service)
+
+      if (serviceRoles.length > 0) {
+        try {
+          const { data: recipients, error: recipientsError } = await supabase
+            .from('users')
+            .select('id, roles!inner(name)')
+            .in('roles.name', serviceRoles)
+
+          if (recipientsError) throw recipientsError
+
+          const recipientIds = Array.from(new Set((recipients || []).map((item) => item.id).filter(Boolean)))
+
+          if (recipientIds.length > 0) {
+            const notifications = recipientIds.map((recipientId) => ({
+              user_id: recipientId,
+              dossier_id: row.id,
+              type: 'ANNULATION_DOSSIER',
+              message: serviceMessage,
+              is_read: false,
+              created_at: nowIso,
+            }))
+
+            const { error: notifyError } = await supabase
+              .from('notifications')
+              .insert(notifications)
+
+            if (notifyError) throw notifyError
+
+            notifiedUsersCount = recipientIds.length
+          }
+        } catch (notifyError) {
+          console.warn('[ServicesMonitoring] Notification service non envoyée:', notifyError)
+        }
+      }
+
+      await logAdminAction(
+        row,
+        'ANNULATION_DOSSIER',
+        clientMessage,
+        { oldStatus: row.etat, newStatus: persistedStatus }
+      )
+
+      setOpenedDossierId((previousId) => (previousId === row.id ? null : previousId))
+
+      if (notifiedUsersCount > 0) {
+        toast.success(`Dossier annulé. Notification envoyée à ${notifiedUsersCount} utilisateur(s).`)
+      } else if (usedFallbackStatus) {
+        toast.success('Dossier annulé. Statut technique appliqué: Clôturé (contrainte base).')
+      } else {
+        toast.success('Dossier annulé avec succès.')
+      }
+    } catch (err) {
+      console.error('[ServicesMonitoring] Erreur annulation dossier:', err)
+      toast.error(`Erreur annulation: ${err.message}`)
+    } finally {
+      clearRowBusy(row.id)
+    }
+  }
+
+  const handleOpenDossier = (row) => {
+    setOpenedDossierId(row.id)
+  }
+
   const handleSlaThresholdChange = (service, value) => {
-    setSlaThresholds((prev) => ({
+    setSlaDraftThresholds((prev) => ({
       ...prev,
       [service]: clampThreshold(value),
     }))
   }
 
-  const exportKpisCsv = async () => {
-    setExporting(true)
-
-    try {
-      const headers = [
-        { key: 'indicateur', label: 'Indicateur' },
-        { key: 'valeur', label: 'Valeur' },
-        { key: 'periode', label: 'Période' },
-        { key: 'agence', label: 'Agence' },
-      ]
-
-      const rows = [
-        { indicateur: 'Dossiers actifs', valeur: dashboard.globalKpis.activeCount, periode: effectivePeriod.label, agence: selectedAgencyLabel },
-        { indicateur: 'Dossiers bloqués', valeur: dashboard.globalKpis.blockedCount, periode: effectivePeriod.label, agence: selectedAgencyLabel },
-        { indicateur: 'SLA global', valeur: `${dashboard.globalKpis.slaRate.toFixed(1)}%`, periode: effectivePeriod.label, agence: selectedAgencyLabel },
-        { indicateur: 'Clôtures période', valeur: dashboard.globalKpis.closedCount, periode: effectivePeriod.label, agence: selectedAgencyLabel },
-        { indicateur: 'Âge moyen actif', valeur: `${dashboard.globalKpis.averageAge.toFixed(1)} jours`, periode: effectivePeriod.label, agence: selectedAgencyLabel },
-        { indicateur: 'SLA RC', valeur: `${dashboard.serviceStats.RELATION_CLIENT.slaRate.toFixed(1)}% (seuil ${dashboard.serviceStats.RELATION_CLIENT.slaThreshold}j)`, periode: effectivePeriod.label, agence: selectedAgencyLabel },
-        { indicateur: 'SLA Prestation', valeur: `${dashboard.serviceStats.PRESTATION.slaRate.toFixed(1)}% (seuil ${dashboard.serviceStats.PRESTATION.slaThreshold}j)`, periode: effectivePeriod.label, agence: selectedAgencyLabel },
-        { indicateur: 'SLA Finance', valeur: `${dashboard.serviceStats.FINANCE.slaRate.toFixed(1)}% (seuil ${dashboard.serviceStats.FINANCE.slaThreshold}j)`, periode: effectivePeriod.label, agence: selectedAgencyLabel },
-      ]
-
-      const csv = buildCsv(headers, rows)
-      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
-      downloadCsvFile(`reporting-kpi-${stamp}.csv`, csv)
-      toast.success('Export KPI généré.')
-    } finally {
-      setExporting(false)
-    }
+  const handleStartSlaEdit = () => {
+    setSlaDraftThresholds(slaThresholds)
+    setIsEditingSla(true)
   }
 
-  const exportOperationsCsv = async () => {
-    setExporting(true)
-
-    try {
-      const headers = [
-        { key: 'souscripteur', label: 'Souscripteur' },
-        { key: 'police', label: 'N° Police' },
-        { key: 'service', label: 'Service' },
-        { key: 'etat', label: 'État' },
-        { key: 'agence', label: 'Agence' },
-        { key: 'docComplet', label: 'Document complet' },
-        { key: 'quittanceSignee', label: 'Quittance signée' },
-        { key: 'conformiteValidee', label: 'Conformité validée' },
-        { key: 'montant', label: 'Montant' },
-        { key: 'derniereMaj', label: 'Dernière MAJ' },
-        { key: 'ageJours', label: 'Âge (jours)' },
-        { key: 'slaService', label: 'Seuil SLA (jours)' },
-        { key: 'isUrgent', label: 'Prioritaire' },
-      ]
-
-      const rows = filteredOperations.map((row) => ({
-        souscripteur: row.souscripteur || 'N/A',
-        police: row.police_number || '-',
-        service: row.serviceLabel,
-        etat: row.etatLabel,
-        agence: row.agenceNom,
-        docComplet: row.documentComplet === true ? 'Oui' : row.documentComplet === false ? 'Non' : 'N/A',
-        quittanceSignee: row.quittanceSignee === true ? 'Oui' : row.quittanceSignee === false ? 'Non' : 'N/A',
-        conformiteValidee: row.conformiteValidee === true ? 'Oui' : row.conformiteValidee === false ? 'Non' : 'N/A',
-        montant: row.montant || row.montant === 0 ? formatMontant(row.montant) : '-',
-        derniereMaj: formatDate(row.lastDate),
-        ageJours: row.staleDays,
-        slaService: row.slaThreshold,
-        isUrgent: row.is_urgent ? 'Oui' : 'Non',
-      }))
-
-      const csv = buildCsv(headers, rows)
-      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
-      downloadCsvFile(`reporting-dossiers-${stamp}.csv`, csv)
-      toast.success('Export dossiers généré.')
-    } finally {
-      setExporting(false)
-    }
+  const handleCancelSlaEdit = () => {
+    setSlaDraftThresholds(slaThresholds)
+    setIsEditingSla(false)
   }
 
-  const exportBlockedCsv = async () => {
-    setExporting(true)
-
-    try {
-      const headers = [
-        { key: 'souscripteur', label: 'Souscripteur' },
-        { key: 'police', label: 'N° Police' },
-        { key: 'service', label: 'Service' },
-        { key: 'etat', label: 'État' },
-        { key: 'agence', label: 'Agence' },
-        { key: 'ageJours', label: 'Ancienneté (jours)' },
-        { key: 'slaService', label: 'Seuil SLA (jours)' },
-        { key: 'prioritaire', label: 'Prioritaire' },
-        { key: 'action', label: 'Action recommandée' },
-      ]
-
-      const rows = filteredBlockedRows.map((row) => ({
-        souscripteur: row.souscripteur || 'N/A',
-        police: row.police_number || '-',
-        service: row.serviceLabel,
-        etat: row.etatLabel,
-        agence: row.agenceNom,
-        ageJours: row.staleDays,
-        slaService: row.slaThreshold,
-        prioritaire: row.is_urgent ? 'Oui' : 'Non',
-        action: row.is_urgent ? 'Escalade admin' : 'Relance ou marquage prioritaire',
-      }))
-
-      const csv = buildCsv(headers, rows)
-      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
-      downloadCsvFile(`reporting-bloques-${stamp}.csv`, csv)
-      toast.success('Export dossiers bloqués généré.')
-    } finally {
-      setExporting(false)
+  const handleConfirmSlaEdit = () => {
+    const nextThresholds = {
+      RELATION_CLIENT: clampThreshold(slaDraftThresholds.RELATION_CLIENT),
+      PRESTATION: clampThreshold(slaDraftThresholds.PRESTATION),
+      FINANCE: clampThreshold(slaDraftThresholds.FINANCE),
     }
+
+    setSlaThresholds(nextThresholds)
+    try {
+      localStorage.setItem(SLA_STORAGE_KEY, JSON.stringify(nextThresholds))
+    } catch (storageError) {
+      console.warn('[ServicesMonitoring] Impossible de sauvegarder les SLA locaux:', storageError)
+    }
+
+    setIsEditingSla(false)
+    toast.success('Seuils SLA mis à jour.')
   }
 
   if (loading) {
@@ -1058,7 +1149,7 @@ export default function ServicesMonitoring() {
 
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-xs text-gray-500 font-medium">
-              {refreshing ? 'Mise à jour en cours...' : 'Données à jour'}
+              {refreshing ? 'Mise a jour en cours...' : formattedLastUpdate}
             </span>
             <button
               onClick={() => fetchDashboardData({ silent: true })}
@@ -1066,48 +1157,13 @@ export default function ServicesMonitoring() {
             >
               Actualiser
             </button>
-            <button
-              onClick={exportKpisCsv}
-              disabled={exporting}
-              className="bg-sky-600 text-white px-3 py-2 rounded-lg hover:bg-sky-700 transition text-xs font-semibold disabled:opacity-50"
-            >
-              Export KPI
-            </button>
-            <button
-              onClick={exportOperationsCsv}
-              disabled={exporting}
-              className="bg-emerald-600 text-white px-3 py-2 rounded-lg hover:bg-emerald-700 transition text-xs font-semibold disabled:opacity-50"
-            >
-              Export dossiers
-            </button>
-            <button
-              onClick={exportBlockedCsv}
-              disabled={exporting}
-              className="bg-amber-600 text-white px-3 py-2 rounded-lg hover:bg-amber-700 transition text-xs font-semibold disabled:opacity-50"
-            >
-              Export bloqués
-            </button>
           </div>
         </div>
 
         <div className="bg-white rounded-xl border border-comar-neutral-border p-5 space-y-4">
           <h2 className="text-lg font-bold text-comar-navy">Filtres et Comparaison</h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">
-                Période
-              </label>
-              <select
-                value={periodPreset}
-                onChange={(event) => setPeriodPreset(event.target.value)}
-                className="w-full px-3 py-2 border border-comar-neutral-border rounded-lg text-sm"
-              >
-                {PERIOD_PRESETS.map((preset) => (
-                  <option key={preset.key} value={preset.key}>{preset.label}</option>
-                ))}
-              </select>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
             <div>
               <label className="block text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">
@@ -1121,21 +1177,6 @@ export default function ServicesMonitoring() {
                 <option value="ALL">Toutes les agences</option>
                 {agencyOptions.map((agency) => (
                   <option key={agency.id} value={agency.id}>{agency.nom}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">
-                Tendance KPI
-              </label>
-              <select
-                value={trendMode}
-                onChange={(event) => setTrendMode(event.target.value)}
-                className="w-full px-3 py-2 border border-comar-neutral-border rounded-lg text-sm"
-              >
-                {TREND_MODES.map((mode) => (
-                  <option key={mode.key} value={mode.key}>{mode.label}</option>
                 ))}
               </select>
             </div>
@@ -1156,36 +1197,44 @@ export default function ServicesMonitoring() {
             </div>
           </div>
 
-          {periodPreset === 'CUSTOM' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">
-                  Date de début
-                </label>
-                <input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(event) => setCustomStartDate(event.target.value)}
-                  className="w-full px-3 py-2 border border-comar-neutral-border rounded-lg text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">
-                  Date de fin
-                </label>
-                <input
-                  type="date"
-                  value={customEndDate}
-                  onChange={(event) => setCustomEndDate(event.target.value)}
-                  className="w-full px-3 py-2 border border-comar-neutral-border rounded-lg text-sm"
-                />
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">
+                Date de début
+              </label>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(event) => setCustomStartDate(event.target.value)}
+                className="w-full px-3 py-2 border border-comar-neutral-border rounded-lg text-sm"
+              />
             </div>
-          )}
+            <div>
+              <label className="block text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">
+                Date de fin
+              </label>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(event) => setCustomEndDate(event.target.value)}
+                className="w-full px-3 py-2 border border-comar-neutral-border rounded-lg text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              onClick={handleResetFilters}
+              disabled={!hasActiveFilters}
+              className="px-4 py-2 text-sm font-semibold rounded-lg border border-comar-neutral-border text-comar-navy hover:bg-comar-navy-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              Réinitialiser les filtres
+            </button>
+          </div>
 
           {!selectedPeriod.isValid && (
             <p className="text-xs text-comar-red font-semibold">
-              Période personnalisée invalide: le dashboard bascule automatiquement sur toutes périodes.
+              Intervalle de dates invalide: le dashboard bascule automatiquement sur toutes périodes.
             </p>
           )}
 
@@ -1195,9 +1244,36 @@ export default function ServicesMonitoring() {
         </div>
 
         <div className="bg-white rounded-xl border border-comar-neutral-border p-5 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h2 className="text-lg font-bold text-comar-navy">Paramètres SLA par service</h2>
-            <p className="text-xs text-gray-500">Valeurs stockées localement (navigateur admin)</p>
+            <div className="flex items-center gap-2 flex-wrap sm:justify-end">
+              <p className="text-xs text-gray-500">Valeurs stockées localement (navigateur admin)</p>
+
+              {!isEditingSla ? (
+                <button
+                  onClick={handleStartSlaEdit}
+                  className="px-4 py-2 text-sm font-semibold rounded-lg border border-comar-neutral-border text-comar-navy hover:bg-comar-navy-50 transition"
+                >
+                  Modifier SLA
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={handleCancelSlaEdit}
+                    className="px-4 py-2 text-sm font-semibold rounded-lg border border-comar-neutral-border text-gray-600 hover:bg-gray-50 transition"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={handleConfirmSlaEdit}
+                    disabled={!hasPendingSlaChanges}
+                    className="px-4 py-2 text-sm font-semibold rounded-lg bg-comar-navy text-white hover:bg-comar-navy-light disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  >
+                    Confirmer
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1209,9 +1285,10 @@ export default function ServicesMonitoring() {
                 type="number"
                 min="1"
                 max="30"
-                value={slaThresholds.RELATION_CLIENT}
+                value={isEditingSla ? slaDraftThresholds.RELATION_CLIENT : slaThresholds.RELATION_CLIENT}
                 onChange={(event) => handleSlaThresholdChange('RELATION_CLIENT', event.target.value)}
-                className="w-full px-3 py-2 border border-comar-neutral-border rounded-lg text-sm"
+                disabled={!isEditingSla}
+                className="w-full px-3 py-2 border border-comar-neutral-border rounded-lg text-sm disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -1223,9 +1300,10 @@ export default function ServicesMonitoring() {
                 type="number"
                 min="1"
                 max="30"
-                value={slaThresholds.PRESTATION}
+                value={isEditingSla ? slaDraftThresholds.PRESTATION : slaThresholds.PRESTATION}
                 onChange={(event) => handleSlaThresholdChange('PRESTATION', event.target.value)}
-                className="w-full px-3 py-2 border border-comar-neutral-border rounded-lg text-sm"
+                disabled={!isEditingSla}
+                className="w-full px-3 py-2 border border-comar-neutral-border rounded-lg text-sm disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -1237,9 +1315,10 @@ export default function ServicesMonitoring() {
                 type="number"
                 min="1"
                 max="30"
-                value={slaThresholds.FINANCE}
+                value={isEditingSla ? slaDraftThresholds.FINANCE : slaThresholds.FINANCE}
                 onChange={(event) => handleSlaThresholdChange('FINANCE', event.target.value)}
-                className="w-full px-3 py-2 border border-comar-neutral-border rounded-lg text-sm"
+                disabled={!isEditingSla}
+                className="w-full px-3 py-2 border border-comar-neutral-border rounded-lg text-sm disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
               />
             </div>
           </div>
@@ -1420,27 +1499,39 @@ export default function ServicesMonitoring() {
                           )}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <button
-                              onClick={() => handleSendAlert(row, 'RELANCE_ADMIN')}
+                              onClick={() => handleOpenDossier(row)}
                               disabled={isBusy}
-                              className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-40"
+                              className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-comar-navy text-white hover:bg-comar-navy-light disabled:opacity-40"
                             >
-                              {busyLabel === 'RELANCE' ? 'Relance...' : 'Relancer'}
+                              Ouvrir dossier
                             </button>
+
+                            {row.is_urgent ? (
+                              <button
+                                onClick={() => handleRemoveUrgent(row)}
+                                disabled={isBusy}
+                                className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-40"
+                              >
+                                {busyLabel === 'UNURGENT' ? 'Maj...' : 'Retirer priorité'}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleMarkUrgent(row)}
+                                disabled={isBusy}
+                                className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-comar-red text-white hover:bg-comar-red-light disabled:opacity-40"
+                              >
+                                {busyLabel === 'URGENT' ? 'Maj...' : 'Prioritaire'}
+                              </button>
+                            )}
+
                             <button
-                              onClick={() => handleSendAlert(row, 'ESCALADE_ADMIN')}
-                              disabled={isBusy}
-                              className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-40"
+                              onClick={() => handleCancelDossier(row)}
+                              disabled={isBusy || row.etat === 'ANNULE' || row.etat === 'CLOTURE'}
+                              className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-amber-700 text-white hover:bg-amber-800 disabled:opacity-40"
                             >
-                              {busyLabel === 'ESCALADE' ? 'Escalade...' : 'Escalader'}
-                            </button>
-                            <button
-                              onClick={() => handleMarkUrgent(row)}
-                              disabled={isBusy || row.is_urgent}
-                              className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-comar-red text-white hover:bg-comar-red-light disabled:opacity-40"
-                            >
-                              {busyLabel === 'URGENT' ? 'Maj...' : 'Prioritaire'}
+                              {busyLabel === 'ANNULATION' ? 'Annulation...' : 'Annuler dossier'}
                             </button>
                           </div>
                         </td>
@@ -1479,7 +1570,7 @@ export default function ServicesMonitoring() {
 
           {filteredOperations.length === 0 ? (
             <div className="p-6 text-sm text-gray-500">
-              Aucun dossier actif pour ce filtre.
+              Aucun dossier actif pour ce service.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -1534,6 +1625,76 @@ export default function ServicesMonitoring() {
             </div>
           )}
         </div>
+
+        {openedDossier && (
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-3xl rounded-xl border border-comar-neutral-border shadow-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-comar-neutral-border flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-comar-navy">Détails du dossier</h3>
+                  <p className="text-xs text-gray-500">{openedDossier.police_number || openedDossier.id}</p>
+                </div>
+                <button
+                  onClick={() => setOpenedDossierId(null)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-comar-neutral-bg text-gray-700 hover:bg-gray-200"
+                >
+                  Fermer
+                </button>
+              </div>
+
+              <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Souscripteur</p>
+                  <p className="text-comar-navy font-semibold">{openedDossier.souscripteur || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Agence</p>
+                  <p className="text-comar-navy">{openedDossier.agenceNom}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Service</p>
+                  <p className="text-comar-navy">{openedDossier.serviceLabel}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">État</p>
+                  <p className="text-comar-navy">{openedDossier.etatLabel}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Dernière mise à jour</p>
+                  <p className="text-comar-navy">{formatDate(openedDossier.lastDate)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Ancienneté</p>
+                  <p className="text-comar-navy">{openedDossier.staleDays} jours</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">SLA service</p>
+                  <p className="text-comar-navy">{openedDossier.slaThreshold} jours</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Priorité</p>
+                  <p className="text-comar-navy">{openedDossier.is_urgent ? 'Prioritaire' : 'Standard'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Document complet</p>
+                  <div>{boolBadge(openedDossier.documentComplet)}</div>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Quittance signée</p>
+                  <div>{boolBadge(openedDossier.quittanceSignee)}</div>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Conformité validée</p>
+                  <div>{boolBadge(openedDossier.conformiteValidee)}</div>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Montant</p>
+                  <p className="text-comar-navy">{openedDossier.montant || openedDossier.montant === 0 ? formatMontant(openedDossier.montant) : '-'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AdminLayout>
   )

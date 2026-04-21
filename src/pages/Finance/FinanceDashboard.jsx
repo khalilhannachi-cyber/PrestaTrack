@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import FinanceLayout from '../../components/FinanceLayout'
 // Utilitaire d'enregistrement des actions Finance
 import { logFinanceAction } from '../../lib/logFinanceAction'
+import { formatRequestNumber } from '../../lib/requestNumber'
 
 /**
  * Dashboard Finance
@@ -73,7 +74,9 @@ export default function FinanceDashboard() {
           police_number,
           niveau,
           etat,
+          is_urgent,
           created_at,
+          updated_at,
           piece_justificative_url,
           agences (
             id,
@@ -87,6 +90,7 @@ export default function FinanceDashboard() {
           )
         `)
         .or('niveau.eq.FINANCE,etat.eq.EN_INSTANCE')
+        .neq('etat', 'ANNULE')
         .order('created_at', { ascending: false })
 
       if (fetchError) throw fetchError
@@ -118,7 +122,7 @@ export default function FinanceDashboard() {
       // ─────────────────────────────────────────────────────────────
       const { data: financeDetails, error: finError } = await supabase
         .from('dossier_details_finance')
-        .select('dossier_id, conformite_validee, moyen_paiement, commentaire_finance')
+        .select('dossier_id, conformite_validee, moyen_paiement, commentaire_finance, date_paiement')
         .in('dossier_id', dossierIds)
 
       if (finError) {
@@ -194,6 +198,13 @@ export default function FinanceDashboard() {
    */
   const handleConformiteSubmit = async () => {
     if (!conformiteDossier) return
+
+    if (conformiteDossier.etat === 'ANNULE') {
+      toast.error('Ce dossier est annulé et n\'est plus accessible pour le service Finance.')
+      closeConformiteModal()
+      return
+    }
+
     setIsSaving(true)
 
     try {
@@ -268,6 +279,11 @@ export default function FinanceDashboard() {
    * @param {Object} dossier - Dossier à clôturer
    */
   const handleConfirmerPaiement = async (dossier) => {
+    if (dossier.etat === 'ANNULE') {
+      toast.error('Ce dossier est annulé et n\'est plus accessible pour le service Finance.')
+      return
+    }
+
     const detailsFinance    = dossier.dossier_details_finance?.[0]    || {}
     const detailsPrestation = dossier.dossier_details_prestation?.[0] || {}
 
@@ -478,6 +494,7 @@ Cette action clôturera définitivement le dossier.`
       EN_INSTANCE: { bg: 'bg-amber-50', text: 'text-amber-700', label: 'En instance' },
       VALIDE:      { bg: 'bg-emerald-50',  text: 'text-emerald-700',  label: 'Validé' },
       REJETE:      { bg: 'bg-red-100',    text: 'text-red-800',    label: 'Rejeté' },
+      ANNULE:      { bg: 'bg-red-100',    text: 'text-red-800',    label: 'Annulé' },
       CLOTURE:     { bg: 'bg-comar-neutral-bg',   text: 'text-gray-700',   label: 'Clôturé' },
     }
     const c = config[etat] || { bg: 'bg-comar-neutral-bg', text: 'text-gray-600', label: etat || '-' }
@@ -624,37 +641,20 @@ Cette action clôturera définitivement le dossier.`
         ) : (
           /* ── Tableau des dossiers ── */
           <div className="bg-white rounded-xl border border-comar-neutral-border overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-comar-neutral-border">
+            <div className="hidden xl:block">
+              <table className="w-full table-fixed divide-y divide-comar-neutral-border">
                 <thead className="bg-comar-navy">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
-                      Souscripteur
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
-                      N° Police
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
-                      Agence
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
-                      Montant
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
-                      Doc. Complet
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
-                      Quittance Signée
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
-                      Conformité Validée
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
-                      État
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    <th className="px-3 py-3 text-left text-[11px] font-bold text-white/80 uppercase tracking-wider">Souscripteur</th>
+                    <th className="px-3 py-3 text-left text-[11px] font-bold text-white/80 uppercase tracking-wider">N° Police</th>
+                    <th className="hidden 2xl:table-cell px-3 py-3 text-left text-[11px] font-bold text-white/80 uppercase tracking-wider">Agence</th>
+                    <th className="px-3 py-3 text-left text-[11px] font-bold text-white/80 uppercase tracking-wider">Montant</th>
+                    <th className="px-3 py-3 text-left text-[11px] font-bold text-white/80 uppercase tracking-wider">Doc.</th>
+                    <th className="px-3 py-3 text-left text-[11px] font-bold text-white/80 uppercase tracking-wider">Quittance</th>
+                    <th className="px-3 py-3 text-left text-[11px] font-bold text-white/80 uppercase tracking-wider">Conformité</th>
+                    <th className="hidden 2xl:table-cell px-3 py-3 text-left text-[11px] font-bold text-white/80 uppercase tracking-wider">Paiement</th>
+                    <th className="px-3 py-3 text-left text-[11px] font-bold text-white/80 uppercase tracking-wider">État</th>
+                    <th className="px-3 py-3 text-left text-[11px] font-bold text-white/80 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-comar-neutral-border">
@@ -662,94 +662,60 @@ Cette action clôturera définitivement le dossier.`
                     const detailsPrestation = dossier.dossier_details_prestation?.[0] || {}
                     const detailsFinance    = dossier.dossier_details_finance?.[0]    || {}
                     const agence            = dossier.agences                         || {}
-
-                    // Quittance signée — bloque toutes les actions Finance si false
                     const quittanceSignee = detailsPrestation.quittance_signee === true
-
-                    // Bouton "Confirmer paiement" actif seulement si :
-                    //   quittance_signee = true ET conformite_validee = true
-                    //   ET le dossier n'est pas déjà clôturé
                     const canConfirmerPaiement =
                       quittanceSignee &&
                       detailsFinance.conformite_validee === true &&
                       dossier.etat !== 'CLOTURE' &&
+                      dossier.etat !== 'ANNULE' &&
                       !isSaving
 
                     return (
-                      <tr key={dossier.id} className="hover:bg-comar-navy-50/30 transition-colors duration-150">
-
-                        {/* Souscripteur */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-semibold text-gray-900">
-                            {dossier.souscripteur || 'N/A'}
+                      <tr key={dossier.id} className="hover:bg-comar-navy-50/30 transition-colors duration-150 align-top">
+                        <td className="px-3 py-3">
+                          <div className="flex flex-col gap-1">
+                            <div className="text-sm font-semibold text-gray-900 break-words">{dossier.souscripteur || 'N/A'}</div>
+                            {dossier.is_urgent && (
+                              <span className="w-fit px-2 py-0.5 inline-flex text-[11px] font-semibold rounded-full bg-comar-red/10 text-comar-red">
+                                Prioritaire
+                              </span>
+                            )}
                           </div>
                         </td>
-
-                        {/* N° Police */}
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono">
-                          {dossier.police_number || '-'}
+                        <td className="px-3 py-3 text-sm text-gray-600 font-mono break-all">{dossier.police_number || '-'}</td>
+                        <td className="hidden 2xl:table-cell px-3 py-3 text-sm text-gray-600 break-words">{agence.nom || '-'}</td>
+                        <td className="px-3 py-3">
+                          <div className="text-sm font-semibold text-gray-900">{formatMontant(detailsPrestation.montant)}</div>
                         </td>
-
-                        {/* Agence */}
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {agence.nom || '-'}
-                        </td>
-
-                        {/* Montant */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-semibold text-gray-900">
-                            {formatMontant(detailsPrestation.montant)}
-                          </div>
-                        </td>
-
-                        {/* Document complet */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <BoolBadge value={detailsPrestation.document_complet} />
-                        </td>
-
-                        {/* Quittance signée */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <BoolBadge value={detailsPrestation.quittance_signee} />
-                        </td>
-
-                        {/* Conformité validée */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <BoolBadge value={detailsFinance.conformite_validee} />
-                        </td>
-
-                        {/* État */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <EtatBadge etat={dossier.etat} />
-                        </td>
-
-                        {/* Actions */}
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-3 py-3"><BoolBadge value={detailsPrestation.document_complet} /></td>
+                        <td className="px-3 py-3"><BoolBadge value={detailsPrestation.quittance_signee} /></td>
+                        <td className="px-3 py-3"><BoolBadge value={detailsFinance.conformite_validee} /></td>
+                        <td className="hidden 2xl:table-cell px-3 py-3 text-sm text-gray-600">{formatDate(detailsFinance.date_paiement)}</td>
+                        <td className="px-3 py-3"><EtatBadge etat={dossier.etat} /></td>
+                        <td className="px-3 py-3">
                           <div className="flex flex-col gap-2">
-
-                            {/* Alerte quittance non signée — bloque toutes les actions */}
                             {!quittanceSignee && (
-                              <p className="text-xs font-semibold text-red-600 flex items-center gap-1 mb-1">
-                                 Paiement impossible : quittance non signée.
-                              </p>
+                              <p className="text-xs font-semibold text-red-600 leading-snug">Paiement impossible : quittance non signée.</p>
                             )}
 
-                            {/* Vérifier conformité */}
                             <button
                               onClick={() => openConformiteModal(dossier)}
-                              disabled={!quittanceSignee || isSaving || dossier.etat === 'CLOTURE'}
+                              disabled={!quittanceSignee || isSaving || dossier.etat === 'CLOTURE' || dossier.etat === 'ANNULE'}
                               title={
                                 !quittanceSignee
                                   ? 'Quittance non signée'
+                                  : dossier.etat === 'ANNULE'
+                                  ? 'Dossier annulé par un administrateur'
                                   : dossier.etat === 'CLOTURE'
                                   ? 'Dossier déjà clôturé'
                                   : 'Vérifier la conformité du dossier'
                               }
-                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-md hover:bg-emerald-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 bg-emerald-600 text-white text-[11px] font-semibold rounded-md hover:bg-emerald-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
                             >
-                               Vérifier conformité
+                              <span className="2xl:hidden">Conformité</span>
+                              <span className="hidden 2xl:inline">Vérifier conformité</span>
                             </button>
 
-                            {/* Confirmer paiement */}
                             <button
                               onClick={() => handleConfirmerPaiement(dossier)}
                               disabled={!canConfirmerPaiement}
@@ -758,23 +724,117 @@ Cette action clôturera définitivement le dossier.`
                                   ? 'Quittance non signée'
                                   : !detailsFinance.conformite_validee
                                   ? 'La conformité doit être validée'
+                                  : dossier.etat === 'ANNULE'
+                                  ? 'Dossier annulé par un administrateur'
                                   : dossier.etat === 'CLOTURE'
                                   ? 'Dossier déjà clôturé'
                                   : 'Confirmer le paiement et clôturer le dossier'
                               }
-                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-comar-navy text-white text-xs font-semibold rounded-md hover:bg-comar-navy-light transition disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 bg-comar-navy text-white text-[11px] font-semibold rounded-md hover:bg-comar-navy-light transition disabled:opacity-40 disabled:cursor-not-allowed"
                             >
-                               Confirmer paiement
+                              <span className="2xl:hidden">Paiement</span>
+                              <span className="hidden 2xl:inline">Confirmer paiement</span>
                             </button>
-
                           </div>
                         </td>
-
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
+            </div>
+
+            <div className="xl:hidden divide-y divide-comar-neutral-border">
+              {dossiers.map((dossier) => {
+                const detailsPrestation = dossier.dossier_details_prestation?.[0] || {}
+                const detailsFinance    = dossier.dossier_details_finance?.[0]    || {}
+                const agence            = dossier.agences                         || {}
+                const quittanceSignee = detailsPrestation.quittance_signee === true
+                const canConfirmerPaiement =
+                  quittanceSignee &&
+                  detailsFinance.conformite_validee === true &&
+                  dossier.etat !== 'CLOTURE' &&
+                  dossier.etat !== 'ANNULE' &&
+                  !isSaving
+
+                return (
+                  <div key={dossier.id} className="p-4 sm:p-5 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 break-words">{dossier.souscripteur || 'N/A'}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 font-mono break-all">{dossier.police_number || '-'}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 break-words">{agence.nom || '-'}</p>
+                      </div>
+                      <EtatBadge etat={dossier.etat} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Montant</p>
+                        <p className="font-semibold text-gray-900">{formatMontant(detailsPrestation.montant)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Date paiement</p>
+                        <p className="text-gray-700">{formatDate(detailsFinance.date_paiement)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-1">Doc. complet</p>
+                        <BoolBadge value={detailsPrestation.document_complet} />
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-1">Quittance signée</p>
+                        <BoolBadge value={detailsPrestation.quittance_signee} />
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-1">Conformité validée</p>
+                        <BoolBadge value={detailsFinance.conformite_validee} />
+                      </div>
+                    </div>
+
+                    {!quittanceSignee && (
+                      <p className="text-xs font-semibold text-red-600">Paiement impossible : quittance non signée.</p>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        onClick={() => openConformiteModal(dossier)}
+                        disabled={!quittanceSignee || isSaving || dossier.etat === 'CLOTURE' || dossier.etat === 'ANNULE'}
+                        title={
+                          !quittanceSignee
+                            ? 'Quittance non signée'
+                            : dossier.etat === 'ANNULE'
+                            ? 'Dossier annulé par un administrateur'
+                            : dossier.etat === 'CLOTURE'
+                            ? 'Dossier déjà clôturé'
+                            : 'Vérifier la conformité du dossier'
+                        }
+                        className="inline-flex items-center justify-center gap-1 px-3 py-2 bg-emerald-600 text-white text-xs font-semibold rounded-md hover:bg-emerald-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Vérifier conformité
+                      </button>
+
+                      <button
+                        onClick={() => handleConfirmerPaiement(dossier)}
+                        disabled={!canConfirmerPaiement}
+                        title={
+                          !quittanceSignee
+                            ? 'Quittance non signée'
+                            : !detailsFinance.conformite_validee
+                            ? 'La conformité doit être validée'
+                            : dossier.etat === 'ANNULE'
+                            ? 'Dossier annulé par un administrateur'
+                            : dossier.etat === 'CLOTURE'
+                            ? 'Dossier déjà clôturé'
+                            : 'Confirmer le paiement et clôturer le dossier'
+                        }
+                        className="inline-flex items-center justify-center gap-1 px-3 py-2 bg-comar-navy text-white text-xs font-semibold rounded-md hover:bg-comar-navy-light transition disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Confirmer paiement
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
@@ -799,7 +859,7 @@ Cette action clôturera définitivement le dossier.`
               <div>
                 <h2 className="text-lg font-bold text-white"> Vérification de conformité</h2>
                 <p className="text-emerald-100 text-sm mt-0.5">
-                  {conformiteDossier.souscripteur} — {conformiteDossier.police_number || 'N/A'} · Dossier #{conformiteDossier.id}
+                  {conformiteDossier.souscripteur} — {conformiteDossier.police_number || 'N/A'} · Demande {formatRequestNumber(conformiteDossier)}
                 </p>
               </div>
               <button
@@ -815,6 +875,14 @@ Cette action clôturera définitivement le dossier.`
             <div className="px-6 pt-5">
               <div className="bg-comar-neutral-bg rounded-xl p-4 border border-comar-neutral-border">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">N° demande</p>
+                    <p className="text-gray-900 font-semibold">{formatRequestNumber(conformiteDossier)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Dernière mise à jour</p>
+                    <p className="text-gray-900">{formatDate(conformiteDossier.updated_at, conformiteDossier.created_at)}</p>
+                  </div>
                   <div>
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Date de création</p>
                     <p className="text-gray-900">{formatDate(conformiteDossier.created_at)}</p>
@@ -848,6 +916,10 @@ Cette action clôturera définitivement le dossier.`
                   <div>
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Moyen de paiement enregistré</p>
                     <p className="text-gray-900">{modalFinanceDetails.moyen_paiement || 'Non renseigné'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Date de paiement</p>
+                    <p className="text-gray-900">{formatDate(modalFinanceDetails.date_paiement)}</p>
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Document complet</p>

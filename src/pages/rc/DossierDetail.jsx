@@ -63,6 +63,10 @@ export default function DossierDetail() {
       if (error) throw error
       if (!data) throw new Error("Le dossier n'existe pas")
 
+      if (data.etat === 'ANNULE') {
+        throw new Error("Ce dossier a été annulé par l'administration et n'est plus accessible.")
+      }
+
       const { data: rcData } = await supabase
         .from('dossier_details_rc')
         .select('telephone, demande_initiale, motif_instance, date_reception')
@@ -93,6 +97,11 @@ export default function DossierDetail() {
 
   // ── Sauvegarder les modifications ─────────────────────────────
   const handleSave = async () => {
+    if (dossier?.etat === 'ANNULE') {
+      toast.error("Ce dossier est annulé et n'est plus modifiable.")
+      return
+    }
+
     if (!editForm.souscripteur || !editForm.police_number || !editForm.motif_instance) {
       toast.error("Veuillez remplir tous les champs obligatoires (*).")
       return
@@ -146,6 +155,11 @@ export default function DossierDetail() {
 
   // ── Transmettre à Prestation ──────────────────────────────────
   const handleTransmitToPrestation = async () => {
+    if (dossier?.etat === 'ANNULE') {
+      toast.error("Ce dossier est annulé et n'est plus transmissible.")
+      return
+    }
+
     if (!window.confirm('Transmettre ce dossier au service Prestation ?\n\nCette action est irréversible.')) return
     setTransmitting(true)
     try {
@@ -173,6 +187,11 @@ export default function DossierDetail() {
 
   // ── Supprimer ─────────────────────────────────────────────────
   const handleDelete = async () => {
+    if (dossier?.etat === 'ANNULE') {
+      toast.error("Ce dossier est annulé et n'est plus supprimable depuis ce service.")
+      return
+    }
+
     if (!window.confirm(`Supprimer définitivement le dossier de "${dossier.souscripteur}" ?\n\nCette action est irréversible.`)) return
     try {
       await supabase.from('historique_actions').delete().eq('dossier_id', id)
@@ -210,8 +229,10 @@ export default function DossierDetail() {
 
   const detailsRC = dossier.dossier_details_rc?.[0] || null
   const isRC = dossier.niveau === 'RELATION_CLIENT'
+  const isLocked = dossier.etat === 'CLOTURE' || dossier.etat === 'ANNULE'
+  const canManageRc = isRC && !isLocked
   const niveauLabel = { RELATION_CLIENT: 'Relation Client', PRESTATION: 'Prestation', FINANCE: 'Finance' }
-  const etatLabel = { EN_COURS: 'En cours', EN_INSTANCE: 'En instance', CLOTURE: 'Clôturé' }
+  const etatLabel = { EN_COURS: 'En cours', EN_INSTANCE: 'En instance', CLOTURE: 'Clôturé', ANNULE: 'Annulé' }
 
   return (
     <RCLayout>
@@ -394,7 +415,7 @@ export default function DossierDetail() {
         {/* ══════ Barre d'actions ══════ */}
         <div className="bg-white rounded-xl border border-comar-neutral-border p-6">
           <div className="flex flex-wrap gap-3">
-            {isRC && !editing && (
+            {canManageRc && !editing && (
               <>
                 <button onClick={() => setEditing(true)}
                   className="bg-comar-navy text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-comar-navy-light transition-all duration-200 flex items-center gap-2 text-sm shadow-sm hover:shadow-md cursor-pointer">
@@ -411,6 +432,12 @@ export default function DossierDetail() {
                   Supprimer
                 </button>
               </>
+            )}
+            {isRC && isLocked && (
+              <div className="flex items-center gap-2 text-red-700 bg-red-50 px-5 py-2.5 rounded-xl border border-red-200">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 7.5h.008v.008H12v-.008z" /></svg>
+                <span className="font-semibold text-sm">Ce dossier est {etatLabel[dossier.etat] || dossier.etat} et n'est plus accessible pour modification.</span>
+              </div>
             )}
             {!isRC && (
               <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 px-5 py-2.5 rounded-xl border border-emerald-200">
