@@ -30,6 +30,7 @@ export default function DossiersList() {
   const [filterSouscripteur, setFilterSouscripteur] = useState('')
   const [filterDate, setFilterDate] = useState('')
   const [filterPolice, setFilterPolice] = useState('')
+  const [exportFormat, setExportFormat] = useState('excel')
 
   useEffect(() => {
     if (user) fetchDossiers()
@@ -191,6 +192,123 @@ export default function DossiersList() {
     return demande
   }
 
+  const getDateReception = (dossier) => {
+    const dateValue = dossier.rc_details?.date_reception || dossier.created_at?.split('T')[0]
+    if (!dateValue) return ''
+    const date = new Date(dateValue)
+    return Number.isNaN(date.getTime()) ? dateValue : date.toLocaleDateString('fr-FR')
+  }
+
+  const escapeCsvValue = (value) => {
+    const str = value == null ? '' : String(value)
+    return `"${str.replace(/"/g, '""')}"`
+  }
+
+  const escapeHtml = (value) => {
+    const str = value == null ? '' : String(value)
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
+  }
+
+  const buildExportRows = (rows) => rows.map(dossier => ({
+    Souscripteur: dossier.souscripteur || '',
+    'Numero Police': dossier.police_number || '',
+    'Date reception': getDateReception(dossier),
+    'Demande initiale': getDemandeInitialeLabel(dossier.rc_details?.demande_initiale, dossier.rc_details?.motif_instance),
+    Agence: dossier.agences ? dossier.agences.nom : '',
+    Niveau: getNiveauLabel(dossier.niveau)
+  }))
+
+  const exportToCsv = (rows) => {
+    const headers = Object.keys(rows[0])
+    const lines = [
+      headers.map(escapeCsvValue).join(','),
+      ...rows.map(row => headers.map(h => escapeCsvValue(row[h])).join(','))
+    ]
+
+    const csvContent = `\uFEFF${lines.join('\n')}`
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `dossiers-${activeTab}-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const exportToPdf = (rows) => {
+    const headers = Object.keys(rows[0])
+    const tableRows = rows.map(row => `
+      <tr>
+        ${headers.map(h => `<td>${escapeHtml(row[h])}</td>`).join('')}
+      </tr>
+    `).join('')
+
+    const html = `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Export dossiers</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
+            h1 { font-size: 18px; margin-bottom: 12px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #e5e7eb; padding: 8px; font-size: 12px; text-align: left; }
+            th { background: #f3f4f6; text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em; }
+          </style>
+        </head>
+        <body>
+          <h1>Export dossiers - ${escapeHtml(activeTab)}</h1>
+          <table>
+            <thead>
+              <tr>
+                ${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `
+
+    const printWindow = window.open('', '_blank', 'width=1000,height=700')
+    if (!printWindow) {
+      toast.error('Impossible d\'ouvrir la fenetre d\'export PDF.')
+      return
+    }
+
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.onload = () => {
+      printWindow.focus()
+      printWindow.print()
+      printWindow.onafterprint = () => printWindow.close()
+    }
+  }
+
+  const handleExport = () => {
+    if (!displayedDossiers.length) {
+      toast.error('Aucun dossier a exporter pour cet onglet.')
+      return
+    }
+
+    const rows = buildExportRows(displayedDossiers)
+    if (exportFormat === 'pdf') {
+      exportToPdf(rows)
+    } else {
+      exportToCsv(rows)
+    }
+  }
+
   if (loading) {
     return (
       <RCLayout>
@@ -217,13 +335,32 @@ export default function DossiersList() {
               {displayedDossiers.length} affiché{displayedDossiers.length > 1 ? 's' : ''} sur {dossiers.length}
             </p>
           </div>
-          <Link
-            to="/rc/dossiers/nouveau"
-            className="bg-comar-navy text-white px-5 py-2.5 rounded-xl hover:bg-comar-navy-light transition-all duration-200 flex items-center gap-2 font-semibold text-sm shadow-sm hover:shadow-md"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-            Nouveau Dossier
-          </Link>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-white border border-comar-neutral-border rounded-xl px-2 py-1.5">
+              <select
+                value={exportFormat}
+                onChange={(e) => setExportFormat(e.target.value)}
+                className="text-sm text-comar-navy bg-transparent outline-none"
+                aria-label="Format d'export"
+              >
+                <option value="excel">Excel (CSV)</option>
+                <option value="pdf">PDF</option>
+              </select>
+              <button
+                onClick={handleExport}
+                className="bg-comar-navy text-white px-3 py-1.5 rounded-lg hover:bg-comar-navy-light transition-all duration-200 text-sm font-semibold"
+              >
+                Exporter
+              </button>
+            </div>
+            <Link
+              to="/rc/dossiers/nouveau"
+              className="bg-comar-navy text-white px-5 py-2.5 rounded-xl hover:bg-comar-navy-light transition-all duration-200 flex items-center gap-2 font-semibold text-sm shadow-sm hover:shadow-md"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+              Nouveau Dossier
+            </Link>
+          </div>
         </div>
 
         {/* Statistiques */}

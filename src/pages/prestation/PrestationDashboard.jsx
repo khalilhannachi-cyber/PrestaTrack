@@ -34,6 +34,11 @@ export default function PrestationDashboard() {
     document_complet: false,
     quittance_signee: false
   })
+  const [exportFormat, setExportFormat] = useState('excel')
+  const [filterSouscripteur, setFilterSouscripteur] = useState('')
+  const [filterDate, setFilterDate] = useState('')
+  const [filterPolice, setFilterPolice] = useState('')
+  const [filterAgence, setFilterAgence] = useState('')
 
   // Chargement des dossiers au montage du composant
   useEffect(() => {
@@ -361,11 +366,10 @@ export default function PrestationDashboard() {
   }
 
   /**
-   * Traite les pièces d'un dossier
-   * Processus en 3 étapes :
-   * 1. Met à jour dossiers.etat à 'EN_INSTANCE'
-   * 2. Crée des notifications pour les utilisateurs PRESTATION et FINANCE
-   * 3. Insère dans historique_actions
+  * Traite les pièces d'un dossier
+  * Processus en 2 étapes :
+  * 1. Met à jour dossiers.etat à 'EN_INSTANCE'
+  * 2. Insère dans historique_actions
    * 
    * @param {Object} dossier - Dossier à traiter
    */
@@ -391,7 +395,7 @@ export default function PrestationDashboard() {
 
     // Confirmation
     const confirmAction = window.confirm(
-      `Voulez-vous marquer les pièces du dossier "${dossier.souscripteur}" comme "à traiter" ?\n\nCela créera des notifications pour les équipes Prestation et Finance.`
+      `Voulez-vous marquer les pièces du dossier "${dossier.souscripteur}" comme "à traiter" ?\n\nLe dossier passera en instance.`
     )
 
     if (!confirmAction) return
@@ -424,54 +428,7 @@ export default function PrestationDashboard() {
       console.log(' [PrestationDashboard] État mis à jour à EN_INSTANCE')
 
       // ─────────────────────────────────────────────────────────────
-      // ÉTAPE 2 : Récupération des utilisateurs PRESTATION et FINANCE
-      // ─────────────────────────────────────────────────────────────
-      console.log(' [PrestationDashboard] Étape 2 : Récupération des utilisateurs à notifier')
-      
-      const { data: usersToNotify, error: usersError } = await supabase
-        .from('users')
-        .select(`
-          id,
-          email,
-          full_name,
-          roles!inner (
-            name
-          )
-        `)
-        .in('roles.name', ['PRESTATION', 'FINANCE'])
-
-      if (usersError) {
-        console.error(' [PrestationDashboard] Erreur récupération utilisateurs:', usersError)
-        // On continue même si ça échoue
-      } else {
-        console.log(' [PrestationDashboard] Utilisateurs à notifier:', usersToNotify?.length || 0)
-        
-        // Création des notifications pour chaque utilisateur
-        if (usersToNotify && usersToNotify.length > 0) {
-          const notifications = usersToNotify.map(userToNotify => ({
-            user_id: userToNotify.id,
-            dossier_id: dossier.id,
-            type: 'PIECE_A_TRAITER',
-            message: `Pièces à traiter pour le dossier de ${dossier.souscripteur}`,
-            is_read: false,
-            created_at: new Date().toISOString()
-          }))
-
-          const { error: notifError } = await supabase
-            .from('notifications')
-            .insert(notifications)
-
-          if (notifError) {
-            console.error(' [PrestationDashboard] Erreur insertion notifications:', notifError)
-            // On continue même si ça échoue
-          } else {
-            console.log(' [PrestationDashboard] Notifications créées')
-          }
-        }
-      }
-
-      // ─────────────────────────────────────────────────────────────
-      // ÉTAPE 3 : Ajout dans l'historique des actions
+      // ÉTAPE 2 : Ajout dans l'historique des actions
       // ─────────────────────────────────────────────────────────────
       await logAction(
         dossier.id,
@@ -489,10 +446,105 @@ export default function PrestationDashboard() {
         d.id === dossier.id ? { ...d, etat: 'EN_INSTANCE' } : d
       ))
 
-      alert(' Pièces marquées pour traitement ! Les équipes ont été notifiées.')
+      alert(' Pièces marquées pour traitement. Le dossier est en instance.')
 
     } catch (err) {
       console.error(' [PrestationDashboard] Erreur lors du traitement des pièces:', err)
+      alert(` Erreur: ${err.message}`)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  /**
+   * Envoie le dossier au service Finance
+   * Prérequis : pièces déjà marquées "à traiter" (etat = EN_INSTANCE)
+   *
+   * @param {Object} dossier - Dossier à envoyer
+   */
+  const handleEnvoyerFinance = async (dossier) => {
+    if (dossier.etat === 'ANNULE' || dossier.etat === 'CLOTURE') {
+      alert(' Ce dossier est clôturé ou annulé et n\'est plus accessible pour le traitement.')
+      return
+    }
+
+    // Vérification d'authentification
+    if (!user || !user.id) {
+      alert(' Votre session a expiré. Veuillez vous reconnecter.')
+      navigate('/login')
+      return
+    }
+
+    if (dossier.etat !== 'EN_INSTANCE') {
+      alert(' Vous devez d\'abord cliquer sur "Pièces à traiter".')
+      return
+    }
+
+    const confirmAction = window.confirm(
+      `Envoyer le dossier "${dossier.souscripteur}" au service Finance ?\n\nCette action notifiera l\'équipe Finance.`
+    )
+
+    if (!confirmAction) return
+
+    setIsSaving(true)
+
+    try {
+      console.log(' [PrestationDashboard] Envoi dossier au service Finance #', dossier.id)
+
+      const { error: updateError } = await supabase
+        .from('dossiers')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', dossier.id)
+
+      if (updateError) {
+        console.error(' [PrestationDashboard] Erreur mise à jour dossier:', updateError)
+        throw new Error(`Erreur lors de l\'envoi: ${updateError.message}`)
+      }
+
+      const { data: usersToNotify, error: usersError } = await supabase
+        .from('users')
+        .select(`
+          id,
+          email,
+          full_name,
+          roles!inner (
+            name
+          )
+        `)
+        .eq('roles.name', 'FINANCE')
+
+      if (usersError) {
+        console.error(' [PrestationDashboard] Erreur récupération Finance:', usersError)
+      } else if (usersToNotify && usersToNotify.length > 0) {
+        const notifications = usersToNotify.map(userToNotify => ({
+          user_id: userToNotify.id,
+          dossier_id: dossier.id,
+          type: 'DOSSIER_ENVOYE_FINANCE',
+          message: `Dossier envoyé au service Finance : ${dossier.souscripteur}`,
+          is_read: false,
+          created_at: new Date().toISOString()
+        }))
+
+        const { error: notifError } = await supabase
+          .from('notifications')
+          .insert(notifications)
+
+        if (notifError) {
+          console.error(' [PrestationDashboard] Erreur insertion notifications:', notifError)
+        }
+      }
+
+      await logAction(
+        dossier.id,
+        'ENVOI_FINANCE',
+        dossier.etat,
+        dossier.etat,
+        'Dossier envoyé au service Finance'
+      )
+
+      alert(' Dossier envoyé au service Finance.')
+    } catch (err) {
+      console.error(' [PrestationDashboard] Erreur lors de l\'envoi Finance:', err)
       alert(` Erreur: ${err.message}`)
     } finally {
       setIsSaving(false)
@@ -738,6 +790,152 @@ export default function PrestationDashboard() {
     )
   }
 
+  const filteredDossiers = dossiers.filter(dossier => {
+    if (filterSouscripteur && !dossier.souscripteur?.toLowerCase().includes(filterSouscripteur.toLowerCase())) return false
+    if (filterPolice && !dossier.police_number?.toLowerCase().includes(filterPolice.toLowerCase())) return false
+    if (filterAgence) {
+      const agenceLabel = `${dossier.agences?.nom || ''} ${dossier.agences?.code || ''}`.toLowerCase()
+      if (!agenceLabel.includes(filterAgence.toLowerCase())) return false
+    }
+    if (filterDate) {
+      const dateRec = dossier.dossier_details_rc?.[0]?.date_reception || dossier.created_at?.split('T')[0]
+      if (!dateRec?.startsWith(filterDate)) return false
+    }
+    return true
+  })
+
+  const getDateReception = (dossier) => {
+    const detailsRC = dossier.dossier_details_rc?.[0] || {}
+    return formatDate(detailsRC.date_reception, dossier.created_at)
+  }
+
+  const getBoolLabel = (value) => {
+    if (value === true) return 'Oui'
+    if (value === false) return 'Non'
+    return ''
+  }
+
+  const escapeCsvValue = (value) => {
+    const str = value == null ? '' : String(value)
+    return `"${str.replace(/"/g, '""')}"`
+  }
+
+  const escapeHtml = (value) => {
+    const str = value == null ? '' : String(value)
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
+  }
+
+  const buildExportRows = (rows) => rows.map(dossier => {
+    const detailsRC = dossier.dossier_details_rc?.[0] || {}
+    const detailsPrestation = dossier.dossier_details_prestation?.[0] || {}
+    const agence = dossier.agences || {}
+
+    return {
+      'Numero demande': formatRequestNumber(dossier),
+      Souscripteur: dossier.souscripteur || '',
+      'Numero Police': dossier.police_number || '',
+      Agence: agence.nom || '',
+      'Date reception': getDateReception(dossier),
+      'Demande initiale': getDemandeInitialeLabel(detailsRC.demande_initiale, detailsRC.motif_instance),
+      Montant: formatMontant(detailsPrestation.montant),
+      'Document complet': getBoolLabel(detailsPrestation.document_complet),
+      'Quittance signee': getBoolLabel(detailsPrestation.quittance_signee),
+      Etat: dossier.etat || '',
+      Niveau: getNiveauLabel(dossier.niveau)
+    }
+  })
+
+  const exportToCsv = (rows) => {
+    const headers = Object.keys(rows[0])
+    const lines = [
+      headers.map(escapeCsvValue).join(','),
+      ...rows.map(row => headers.map(h => escapeCsvValue(row[h])).join(','))
+    ]
+
+    const csvContent = `\uFEFF${lines.join('\n')}`
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `dossiers-prestation-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const exportToPdf = (rows) => {
+    const headers = Object.keys(rows[0])
+    const tableRows = rows.map(row => `
+      <tr>
+        ${headers.map(h => `<td>${escapeHtml(row[h])}</td>`).join('')}
+      </tr>
+    `).join('')
+
+    const html = `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Export dossiers prestation</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
+            h1 { font-size: 18px; margin-bottom: 12px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #e5e7eb; padding: 8px; font-size: 12px; text-align: left; }
+            th { background: #f3f4f6; text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em; }
+          </style>
+        </head>
+        <body>
+          <h1>Export dossiers - Prestation</h1>
+          <table>
+            <thead>
+              <tr>
+                ${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `
+
+    const printWindow = window.open('', '_blank', 'width=1000,height=700')
+    if (!printWindow) {
+      alert('Impossible d\'ouvrir la fenetre d\'export PDF.')
+      return
+    }
+
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.onload = () => {
+      printWindow.focus()
+      printWindow.print()
+      printWindow.onafterprint = () => printWindow.close()
+    }
+  }
+
+  const handleExport = () => {
+    if (!filteredDossiers.length) {
+      alert('Aucun dossier a exporter.')
+      return
+    }
+
+    const rows = buildExportRows(filteredDossiers)
+    if (exportFormat === 'pdf') {
+      exportToPdf(rows)
+    } else {
+      exportToCsv(rows)
+    }
+  }
+
   // Affichage du loader pendant le chargement
   if (loading) {
     return (
@@ -788,16 +986,36 @@ export default function PrestationDashboard() {
           <div>
             <h1 className="text-3xl font-bold text-comar-navy">Dashboard Prestations</h1>
             <p className="text-gray-600 mt-1">
-              Liste de tous les dossiers au niveau Prestation ({dossiers.length} au total)
+              {filteredDossiers.length} affiché{filteredDossiers.length > 1 ? 's' : ''} sur {dossiers.length}
             </p>
           </div>
-          <button
-            onClick={fetchPrestationDossiers}
-            className="bg-comar-navy text-white px-6 py-3 rounded-xl hover:bg-comar-navy-light transition flex items-center gap-2 font-semibold"
-          >
-            <span className="text-xl"></span>
-            Actualiser
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-white border border-comar-neutral-border rounded-xl px-2 py-1.5">
+              <select
+                value={exportFormat}
+                onChange={(e) => setExportFormat(e.target.value)}
+                className="text-sm text-comar-navy bg-transparent outline-none"
+                aria-label="Format d'export"
+              >
+                <option value="excel">Excel (CSV)</option>
+                <option value="pdf">PDF</option>
+              </select>
+              <button
+                onClick={handleExport}
+                className="inline-flex items-center gap-1.5 bg-comar-navy text-white px-3 py-1.5 rounded-lg hover:bg-comar-navy-light transition-all duration-200 text-sm font-semibold"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M7.5 10.5l4.5 4.5m0 0l4.5-4.5m-4.5 4.5V3" /></svg>
+                Exporter
+              </button>
+            </div>
+            <button
+              onClick={fetchPrestationDossiers}
+              className="bg-comar-navy text-white px-6 py-3 rounded-xl hover:bg-comar-navy-light transition inline-flex items-center gap-2 font-semibold"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" /></svg>
+              Actualiser
+            </button>
+          </div>
         </div>
 
         {/* Statistiques rapides */}
@@ -869,12 +1087,78 @@ export default function PrestationDashboard() {
 
         )}
 
+          {/* ══════ Filtres ══════ */}
+          <div className="bg-white rounded-xl border border-comar-neutral-border p-4 mb-6">
+            <h3 className="text-xs font-semibold text-comar-navy uppercase tracking-wider mb-3 flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" /></svg>
+              Filtres
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Souscripteur</label>
+                <input
+                  type="text"
+                  value={filterSouscripteur}
+                  onChange={(e) => setFilterSouscripteur(e.target.value)}
+                  placeholder="Rechercher..."
+                  className="w-full px-3 py-2 border border-comar-neutral-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Agence</label>
+                <input
+                  type="text"
+                  value={filterAgence}
+                  onChange={(e) => setFilterAgence(e.target.value)}
+                  placeholder="Rechercher..."
+                  className="w-full px-3 py-2 border border-comar-neutral-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Date de réception</label>
+                <input
+                  type="date"
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-comar-neutral-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Numéro Police</label>
+                <input
+                  type="text"
+                  value={filterPolice}
+                  onChange={(e) => setFilterPolice(e.target.value)}
+                  placeholder="Rechercher..."
+                  className="w-full px-3 py-2 border border-comar-neutral-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all"
+                />
+              </div>
+            </div>
+            {(filterSouscripteur || filterDate || filterPolice || filterAgence) && (
+              <button
+                onClick={() => { setFilterSouscripteur(''); setFilterDate(''); setFilterPolice(''); setFilterAgence('') }}
+                className="mt-3 text-xs text-comar-navy hover:text-comar-red font-medium transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                Réinitialiser les filtres
+              </button>
+            )}
+          </div>
+
         {/* Message si aucun dossier */}
         {dossiers.length === 0 ? (
           <div className="bg-white rounded-xl border border-comar-neutral-border p-12 text-center">
             <div className="text-6xl mb-4"></div>
             <h3 className="text-xl font-semibold text-comar-navy mb-2">Aucun dossier prestation</h3>
             <p className="text-gray-600">Aucun dossier n'est actuellement au niveau PRESTATION.</p>
+          </div>
+        ) : filteredDossiers.length === 0 ? (
+          <div className="bg-white rounded-xl border border-comar-neutral-border p-12 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-amber-50 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+            </div>
+            <h3 className="text-lg font-semibold text-comar-navy mb-2">Aucun résultat</h3>
+            <p className="text-sm text-gray-500">Aucun dossier ne correspond aux filtres appliqués.</p>
           </div>
         ) : (
           /* Tableau des dossiers */
@@ -896,9 +1180,6 @@ export default function PrestationDashboard() {
                       Date Réception
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
-                      Montant
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
                       Doc. Complet
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-white/80 uppercase tracking-wider">
@@ -913,7 +1194,7 @@ export default function PrestationDashboard() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-comar-neutral-border">
-                  {dossiers.map((dossier) => {
+                  {filteredDossiers.map((dossier) => {
                     // Extraction des données jointes (peut être null/undefined)
                     const detailsRC = dossier.dossier_details_rc?.[0] || {}
                     const detailsPrestation = dossier.dossier_details_prestation?.[0] || {}
@@ -929,6 +1210,7 @@ export default function PrestationDashboard() {
                     const canEdit = isNiveauPrestation && !isLocked && !isSaving
                     // "Pièces à traiter" actif uniquement si doc complet et niveau PRESTATION
                     const canMarkPieces = isNiveauPrestation && !isLocked && isDocumentComplet && !isSaving
+                    const canEnvoyerFinance = isNiveauPrestation && !isLocked && dossier.etat === 'EN_INSTANCE' && !isSaving
                     // Désactiver "Transfert quittance" si le document n'est pas complet OU quittance_signee = false OU niveau != PRESTATION
                     const canTransferQuittance = isNiveauPrestation && !isLocked && isDocumentComplet && isQuittanceSignee && !isSaving
 
@@ -963,13 +1245,6 @@ export default function PrestationDashboard() {
                           {formatDate(detailsRC.date_reception, dossier.created_at)}
                         </td>
                         
-                        {/* Montant */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-semibold text-gray-900">
-                            {formatMontant(detailsPrestation.montant)}
-                          </div>
-                        </td>
-                        
                         {/* Document complet */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           {renderBooleanBadge(detailsPrestation.document_complet)}
@@ -991,7 +1266,7 @@ export default function PrestationDashboard() {
                             <button
                               onClick={() => openEditModal(dossier)}
                               disabled={!canEdit}
-                              className={`px-3 py-1 rounded transition text-xs font-semibold ${
+                              className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${
                                 canEdit
                                   ? 'bg-comar-navy text-white hover:bg-comar-navy-light'
                                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -1004,12 +1279,13 @@ export default function PrestationDashboard() {
                                   : 'Traiter le dossier'
                               }
                             >
-                               Traiter
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" /></svg>
+                              Traiter
                             </button>
                             <button
                               onClick={() => handlePiecesATraiter(dossier)}
                               disabled={!canMarkPieces}
-                              className={`px-3 py-1 rounded transition text-xs font-semibold ${
+                              className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${
                                 canMarkPieces
                                   ? 'bg-emerald-600 text-white hover:bg-emerald-700'
                                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -1024,12 +1300,13 @@ export default function PrestationDashboard() {
                                   : 'Marquer les pièces comme à traiter'
                               }
                             >
-                               Pièces à traiter
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                              Pièces à traiter
                             </button>
                             <button
                               onClick={() => handleTransfertQuittance(dossier)}
                               disabled={!canTransferQuittance}
-                              className={`px-3 py-1 rounded transition text-xs font-semibold ${
+                              className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${
                                 canTransferQuittance
                                   ? 'bg-violet-600 text-white hover:bg-violet-700'
                                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -1046,7 +1323,29 @@ export default function PrestationDashboard() {
                                   : 'Transférer la quittance au service Finance'
                               }
                             >
-                               Transfert quittance
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 16.5L16.5 7.5M16.5 7.5H9.75M16.5 7.5v6.75" /></svg>
+                              Transfert quittance
+                            </button>
+                            <button
+                              onClick={() => handleEnvoyerFinance(dossier)}
+                              disabled={!canEnvoyerFinance}
+                              className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${
+                                canEnvoyerFinance
+                                  ? 'bg-comar-navy text-white hover:bg-comar-navy-light'
+                                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              }`}
+                              title={
+                                !isNiveauPrestation
+                                  ? 'Le dossier n\'est plus au niveau PRESTATION'
+                                  : isLocked
+                                  ? 'Dossier clôturé ou annulé'
+                                  : dossier.etat !== 'EN_INSTANCE'
+                                  ? 'Cliquez d\'abord sur "Pièces à traiter"'
+                                  : 'Envoyer le dossier au service Finance'
+                              }
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
+                              Envoyer
                             </button>
                           </div>
                         </td>
@@ -1061,7 +1360,7 @@ export default function PrestationDashboard() {
             <div className="bg-comar-neutral-bg px-6 py-4 border-t border-comar-neutral-border">
               <div className="flex justify-between items-center text-sm text-gray-600">
                 <span>
-                  Total : <span className="font-semibold text-gray-900">{dossiers.length}</span> dossier{dossiers.length > 1 ? 's' : ''}
+                  Total : <span className="font-semibold text-gray-900">{filteredDossiers.length}</span> dossier{filteredDossiers.length > 1 ? 's' : ''}
                 </span>
                 <span className="text-xs text-gray-500">
                   Dernière mise à jour : {new Date().toLocaleTimeString('fr-FR')}

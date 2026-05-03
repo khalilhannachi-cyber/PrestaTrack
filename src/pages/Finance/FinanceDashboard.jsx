@@ -29,6 +29,7 @@ export default function FinanceDashboard() {
   const [dossiers, setDossiers] = useState([]) // Liste des dossiers
   const [loading, setLoading] = useState(true) // Indicateur de chargement
   const [error, setError] = useState(null) // Erreur éventuelle
+  const [exportFormat, setExportFormat] = useState('excel')
 
   // États pour la modal de conformité
   const [isConformiteModalOpen, setIsConformiteModalOpen] = useState(false)
@@ -105,6 +106,30 @@ export default function FinanceDashboard() {
 
       const dossierIds = dossiersData.map((d) => d.id)
 
+      let actionInfoAvailable = false
+      const sentToFinanceSet = new Set()
+      const quittanceTransferredSet = new Set()
+
+      if (dossierIds.length > 0) {
+        const { data: actionHistory, error: actionError } = await supabase
+          .from('historique_actions')
+          .select('dossier_id, action')
+          .in('dossier_id', dossierIds)
+          .in('action', ['ENVOI_FINANCE', 'QUITTANCE_TRANSFEREE'])
+
+        if (actionError) {
+          console.warn(' [FinanceDashboard] Erreur historique_actions :', actionError.message)
+        } else {
+          actionInfoAvailable = true
+          if (actionHistory) {
+            actionHistory.forEach((item) => {
+              if (item.action === 'ENVOI_FINANCE') sentToFinanceSet.add(item.dossier_id)
+              if (item.action === 'QUITTANCE_TRANSFEREE') quittanceTransferredSet.add(item.dossier_id)
+            })
+          }
+        }
+      }
+
       // ─────────────────────────────────────────────────────────────
       // Requête 2 : détails prestation (contourne RLS JOIN)
       // ─────────────────────────────────────────────────────────────
@@ -142,14 +167,32 @@ export default function FinanceDashboard() {
         financeDetails.forEach((f) => { financeMap[f.dossier_id] = f })
       }
 
-      const merged = dossiersData.map((d) => ({
-        ...d,
-        dossier_details_prestation: prestationMap[d.id] ? [prestationMap[d.id]] : [],
-        dossier_details_finance: financeMap[d.id] ? [financeMap[d.id]] : [],
-      }))
+      const merged = dossiersData.map((d) => {
+        const prestation = prestationMap[d.id]
+        const finance = financeMap[d.id]
+        const quittanceSignee = prestation?.quittance_signee === true
+        const quittanceTransferred = actionInfoAvailable
+          ? quittanceTransferredSet.has(d.id)
+          : quittanceSignee
+        const sentToFinance = actionInfoAvailable
+          ? sentToFinanceSet.has(d.id)
+          : d.etat === 'EN_INSTANCE'
 
-      console.log(' [FinanceDashboard] Fusion terminée :', merged.length, 'dossier(s)')
-      setDossiers(merged)
+        return {
+          ...d,
+          dossier_details_prestation: prestation ? [prestation] : [],
+          dossier_details_finance: finance ? [finance] : [],
+          sent_to_finance: sentToFinance,
+          quittance_transferred: quittanceTransferred
+        }
+      })
+
+      const filtered = actionInfoAvailable
+        ? merged.filter((d) => d.niveau === 'FINANCE' || (d.etat === 'EN_INSTANCE' && d.sent_to_finance))
+        : merged
+
+      console.log(' [FinanceDashboard] Fusion terminée :', filtered.length, 'dossier(s)')
+      setDossiers(filtered)
     } catch (err) {
       console.error(' [FinanceDashboard] Erreur lors du chargement :', err)
       setError(err.message || 'Erreur inconnue lors du chargement des dossiers')
@@ -227,8 +270,8 @@ export default function FinanceDashboard() {
 
       console.log(' [FinanceDashboard] dossier_details_finance mis à jour')
 
-      // ── Étape 1b : Si conformité validée, changer niveau à FINANCE ──
-      if (conformiteForm.conformite_validee) {
+      // ── Étape 1b : Si conformité validée ET quittance transférée, changer niveau à FINANCE ──
+      if (conformiteForm.conformite_validee && conformiteDossier?.quittance_transferred) {
         const { error: niveauErr } = await supabase
           .from('dossiers')
           .update({ niveau: 'FINANCE', updated_at: new Date().toISOString() })
@@ -239,6 +282,8 @@ export default function FinanceDashboard() {
         } else {
           console.log(' [FinanceDashboard] Niveau mis à jour à FINANCE')
         }
+      } else if (conformiteForm.conformite_validee) {
+        toast('Conformité enregistrée. Le dossier passera au niveau Finance après transfert de la quittance.')
       }
 
       // ── Étape 2 : Historique des actions ──────────────────────────
@@ -274,7 +319,7 @@ export default function FinanceDashboard() {
    *   3. Insert historique_actions           → action = 'PAIEMENT_CONFIRME'
    *   4. Crée des notifications pour tous les utilisateurs Relation Client
    *
-   * Condition d'activation : conformite_validee = true ET quittance_signee = true
+  * Condition d'activation : conformite_validee = true ET quittance_transferee = true
    *
    * @param {Object} dossier - Dossier à clôturer
    */
@@ -286,9 +331,21 @@ export default function FinanceDashboard() {
 
     const detailsFinance    = dossier.dossier_details_finance?.[0]    || {}
     const detailsPrestation = dossier.dossier_details_prestation?.[0] || {}
+    const quittanceSignee = detailsPrestation.quittance_signee === true
+    const quittanceTransferee = dossier.quittance_transferred === true
 
-    if (!detailsFinance.conformite_validee || !detailsPrestation.quittance_signee) {
-      toast.error("La conformité doit être validée et la quittance signée avant de confirmer le paiement.")
+    if (!detailsFinance.conformite_validee) {
+      toast.error("La conformité doit être validée avant de confirmer le paiement.")
+      return
+    }
+
+    if (!quittanceSignee) {
+      toast.error("La quittance doit être signée avant de confirmer le paiement.")
+      return
+    }
+
+    if (!quittanceTransferee) {
+      toast.error("La quittance doit être transférée au service Finance avant de confirmer le paiement.")
       return
     }
 
@@ -461,6 +518,137 @@ Cette action clôturera définitivement le dossier.`
     return demande
   }
 
+  const getBoolLabel = (value) => {
+    if (value === true) return 'Oui'
+    if (value === false) return 'Non'
+    return ''
+  }
+
+  const escapeCsvValue = (value) => {
+    const str = value == null ? '' : String(value)
+    return `"${str.replace(/"/g, '""')}"`
+  }
+
+  const escapeHtml = (value) => {
+    const str = value == null ? '' : String(value)
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
+  }
+
+  const buildExportRows = (rows) => rows.map(dossier => {
+    const detailsRC = dossier.dossier_details_rc?.[0] || {}
+    const detailsPrestation = dossier.dossier_details_prestation?.[0] || {}
+    const detailsFinance = dossier.dossier_details_finance?.[0] || {}
+    const agence = dossier.agences || {}
+
+    return {
+      'Numero demande': formatRequestNumber(dossier),
+      Souscripteur: dossier.souscripteur || '',
+      'Numero Police': dossier.police_number || '',
+      Agence: agence.nom || '',
+      'Date reception': formatDate(detailsRC.date_reception, dossier.created_at),
+      'Demande initiale': getDemandeInitialeLabel(detailsRC.demande_initiale, detailsRC.motif_instance),
+      Montant: formatMontant(detailsPrestation.montant),
+      'Document complet': getBoolLabel(detailsPrestation.document_complet),
+      'Quittance signee': getBoolLabel(detailsPrestation.quittance_signee),
+      'Conformite validee': getBoolLabel(detailsFinance.conformite_validee),
+      'Moyen paiement': detailsFinance.moyen_paiement || '',
+      'Date paiement': formatDate(detailsFinance.date_paiement),
+      Etat: dossier.etat || '',
+      Niveau: getNiveauLabel(dossier.niveau)
+    }
+  })
+
+  const exportToCsv = (rows) => {
+    const headers = Object.keys(rows[0])
+    const lines = [
+      headers.map(escapeCsvValue).join(','),
+      ...rows.map(row => headers.map(h => escapeCsvValue(row[h])).join(','))
+    ]
+
+    const csvContent = `\uFEFF${lines.join('\n')}`
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `dossiers-finance-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const exportToPdf = (rows) => {
+    const headers = Object.keys(rows[0])
+    const tableRows = rows.map(row => `
+      <tr>
+        ${headers.map(h => `<td>${escapeHtml(row[h])}</td>`).join('')}
+      </tr>
+    `).join('')
+
+    const html = `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Export dossiers finance</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
+            h1 { font-size: 18px; margin-bottom: 12px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #e5e7eb; padding: 8px; font-size: 12px; text-align: left; }
+            th { background: #f3f4f6; text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em; }
+          </style>
+        </head>
+        <body>
+          <h1>Export dossiers - Finance</h1>
+          <table>
+            <thead>
+              <tr>
+                ${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `
+
+    const printWindow = window.open('', '_blank', 'width=1000,height=700')
+    if (!printWindow) {
+      toast.error('Impossible d\'ouvrir la fenetre d\'export PDF.')
+      return
+    }
+
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.onload = () => {
+      printWindow.focus()
+      printWindow.print()
+      printWindow.onafterprint = () => printWindow.close()
+    }
+  }
+
+  const handleExport = () => {
+    if (!dossiers.length) {
+      toast.error('Aucun dossier a exporter.')
+      return
+    }
+
+    const rows = buildExportRows(dossiers)
+    if (exportFormat === 'pdf') {
+      exportToPdf(rows)
+    } else {
+      exportToCsv(rows)
+    }
+  }
+
   /**
    * Retourne un badge JSX pour un champ booléen
    * @param {boolean|null|undefined} value
@@ -567,13 +755,32 @@ Cette action clôturera définitivement le dossier.`
               Liste de tous les dossiers au niveau Finance ({dossiers.length} au total)
             </p>
           </div>
-          <button
-            onClick={fetchFinanceDossiers}
-            className="bg-comar-navy text-white px-6 py-3 rounded-xl hover:bg-comar-navy-light transition flex items-center gap-2 font-semibold"
-          >
-            <span className="text-xl"></span>
-            Actualiser
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-white border border-comar-neutral-border rounded-xl px-2 py-1.5">
+              <select
+                value={exportFormat}
+                onChange={(e) => setExportFormat(e.target.value)}
+                className="text-sm text-comar-navy bg-transparent outline-none"
+                aria-label="Format d'export"
+              >
+                <option value="excel">Excel (CSV)</option>
+                <option value="pdf">PDF</option>
+              </select>
+              <button
+                onClick={handleExport}
+                className="bg-comar-navy text-white px-3 py-1.5 rounded-lg hover:bg-comar-navy-light transition-all duration-200 text-sm font-semibold"
+              >
+                Exporter
+              </button>
+            </div>
+            <button
+              onClick={fetchFinanceDossiers}
+              className="bg-comar-navy text-white px-6 py-3 rounded-xl hover:bg-comar-navy-light transition flex items-center gap-2 font-semibold"
+            >
+              <span className="text-xl"></span>
+              Actualiser
+            </button>
+          </div>
         </div>
 
         {/* ── Statistiques rapides ── */}
@@ -663,8 +870,10 @@ Cette action clôturera définitivement le dossier.`
                     const detailsFinance    = dossier.dossier_details_finance?.[0]    || {}
                     const agence            = dossier.agences                         || {}
                     const quittanceSignee = detailsPrestation.quittance_signee === true
+                    const quittanceTransferee = dossier.quittance_transferred === true
                     const canConfirmerPaiement =
                       quittanceSignee &&
+                      quittanceTransferee &&
                       detailsFinance.conformite_validee === true &&
                       dossier.etat !== 'CLOTURE' &&
                       dossier.etat !== 'ANNULE' &&
@@ -694,17 +903,17 @@ Cette action clôturera définitivement le dossier.`
                         <td className="px-3 py-3"><EtatBadge etat={dossier.etat} /></td>
                         <td className="px-3 py-3">
                           <div className="flex flex-col gap-2">
-                            {!quittanceSignee && (
+                            {!quittanceSignee ? (
                               <p className="text-xs font-semibold text-red-600 leading-snug">Paiement impossible : quittance non signée.</p>
-                            )}
+                            ) : !quittanceTransferee ? (
+                              <p className="text-xs font-semibold text-red-600 leading-snug">Paiement impossible : quittance non transférée.</p>
+                            ) : null}
 
                             <button
                               onClick={() => openConformiteModal(dossier)}
-                              disabled={!quittanceSignee || isSaving || dossier.etat === 'CLOTURE' || dossier.etat === 'ANNULE'}
+                              disabled={isSaving || dossier.etat === 'CLOTURE' || dossier.etat === 'ANNULE'}
                               title={
-                                !quittanceSignee
-                                  ? 'Quittance non signée'
-                                  : dossier.etat === 'ANNULE'
+                                dossier.etat === 'ANNULE'
                                   ? 'Dossier annulé par un administrateur'
                                   : dossier.etat === 'CLOTURE'
                                   ? 'Dossier déjà clôturé'
@@ -722,6 +931,8 @@ Cette action clôturera définitivement le dossier.`
                               title={
                                 !quittanceSignee
                                   ? 'Quittance non signée'
+                                  : !quittanceTransferee
+                                  ? 'Quittance non transférée'
                                   : !detailsFinance.conformite_validee
                                   ? 'La conformité doit être validée'
                                   : dossier.etat === 'ANNULE'
@@ -750,8 +961,10 @@ Cette action clôturera définitivement le dossier.`
                 const detailsFinance    = dossier.dossier_details_finance?.[0]    || {}
                 const agence            = dossier.agences                         || {}
                 const quittanceSignee = detailsPrestation.quittance_signee === true
+                const quittanceTransferee = dossier.quittance_transferred === true
                 const canConfirmerPaiement =
                   quittanceSignee &&
+                  quittanceTransferee &&
                   detailsFinance.conformite_validee === true &&
                   dossier.etat !== 'CLOTURE' &&
                   dossier.etat !== 'ANNULE' &&
@@ -791,18 +1004,18 @@ Cette action clôturera définitivement le dossier.`
                       </div>
                     </div>
 
-                    {!quittanceSignee && (
+                    {!quittanceSignee ? (
                       <p className="text-xs font-semibold text-red-600">Paiement impossible : quittance non signée.</p>
-                    )}
+                    ) : !quittanceTransferee ? (
+                      <p className="text-xs font-semibold text-red-600">Paiement impossible : quittance non transférée.</p>
+                    ) : null}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <button
                         onClick={() => openConformiteModal(dossier)}
-                        disabled={!quittanceSignee || isSaving || dossier.etat === 'CLOTURE' || dossier.etat === 'ANNULE'}
+                        disabled={isSaving || dossier.etat === 'CLOTURE' || dossier.etat === 'ANNULE'}
                         title={
-                          !quittanceSignee
-                            ? 'Quittance non signée'
-                            : dossier.etat === 'ANNULE'
+                          dossier.etat === 'ANNULE'
                             ? 'Dossier annulé par un administrateur'
                             : dossier.etat === 'CLOTURE'
                             ? 'Dossier déjà clôturé'
@@ -819,6 +1032,8 @@ Cette action clôturera définitivement le dossier.`
                         title={
                           !quittanceSignee
                             ? 'Quittance non signée'
+                            : !quittanceTransferee
+                            ? 'Quittance non transférée'
                             : !detailsFinance.conformite_validee
                             ? 'La conformité doit être validée'
                             : dossier.etat === 'ANNULE'
