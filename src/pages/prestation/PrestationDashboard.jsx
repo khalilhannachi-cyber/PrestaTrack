@@ -9,7 +9,8 @@ import { formatRequestNumber } from '../../lib/requestNumber'
 import { useAuth } from '../../contexts/AuthContext'
 // Layout spécifique aux pages Prestation
 import PrestationLayout from '../../components/PrestationLayout'
-
+import ConfirmModal from '../../components/ConfirmModal'
+import { toast } from 'react-hot-toast'
 /**
  * Dashboard des prestations
  * Affiche tous les dossiers au niveau PRESTATION
@@ -23,6 +24,7 @@ export default function PrestationDashboard() {
   const [dossiers, setDossiers] = useState([]) // Liste des dossiers
   const [loading, setLoading] = useState(true) // Indicateur de chargement
   const [error, setError] = useState(null) // Erreur éventuelle
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', type: 'warning', onConfirm: null })
   
   // États pour la modal d'édition
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -34,6 +36,7 @@ export default function PrestationDashboard() {
     document_complet: false,
     quittance_signee: false
   })
+  const [activeTab, setActiveTab] = useState('en_cours')
   const [exportFormat, setExportFormat] = useState('excel')
   const [filterSouscripteur, setFilterSouscripteur] = useState('')
   const [filterDate, setFilterDate] = useState('')
@@ -118,8 +121,7 @@ export default function PrestationDashboard() {
           created_at,
           updated_at,
           piece_justificative_url,
-          agences ( id, nom, code ),
-          dossier_details_rc ( date_reception, motif_instance, demande_initiale, telephone )
+          agences ( id, nom, code )
         `)
         .eq('niveau', 'PRESTATION')
         .neq('etat', 'ANNULE')
@@ -133,12 +135,18 @@ export default function PrestationDashboard() {
         return
       }
 
-      // Requête 2 : détails prestation en requête séparée (contourne RLS JOIN)
+      // Requête 2 : détails prestation et RC en requêtes séparées (contourne RLS JOIN)
       const dossierIds = dossiers.map(d => d.id)
-      const { data: prestationDetails } = await supabase
-        .from('dossier_details_prestation')
-        .select('dossier_id, montant, document_complet, quittance_signee')
-        .in('dossier_id', dossierIds)
+      const [{ data: prestationDetails }, { data: rcDetails }] = await Promise.all([
+        supabase
+          .from('dossier_details_prestation')
+          .select('dossier_id, montant, document_complet, quittance_signee')
+          .in('dossier_id', dossierIds),
+        supabase
+          .from('dossier_details_rc')
+          .select('dossier_id, date_reception, motif_instance, demande_initiale, telephone')
+          .in('dossier_id', dossierIds)
+      ])
 
       // Fusion manuelle
       const prestationMap = {}
@@ -146,11 +154,51 @@ export default function PrestationDashboard() {
         prestationDetails.forEach(p => { prestationMap[p.dossier_id] = p })
       }
 
-      const merged = dossiers.map(d => ({
-        ...d,
-        dossier_details_prestation: prestationMap[d.id] ? [prestationMap[d.id]] : []
-      }))
+      const rcMap = {}
+      if (rcDetails) {
+        rcDetails.forEach(r => { rcMap[r.dossier_id] = r })
+      }
 
+      // Requête 3 : Historique pour statuts "envoyé"
+      let sentToFinanceSet = new Set()
+      let quittanceTransferredSet = new Set()
+      if (dossierIds.length > 0) {
+        const { data: actionHistory } = await supabase
+          .from('historique_actions')
+          .select('dossier_id, action')
+          .in('dossier_id', dossierIds)
+          .in('action', ['ENVOI_FINANCE', 'QUITTANCE_TRANSFEREE'])
+
+        if (actionHistory) {
+          actionHistory.forEach(item => {
+            if (item.action === 'ENVOI_FINANCE') sentToFinanceSet.add(item.dossier_id)
+            if (item.action === 'QUITTANCE_TRANSFEREE') quittanceTransferredSet.add(item.dossier_id)
+          })
+        }
+      }
+
+      const merged = dossiers.map(d => {
+        const wasSent = sentToFinanceSet.has(d.id)
+        const quittanceDone = quittanceTransferredSet.has(d.id)
+        return {
+          ...d,
+          dossier_details_prestation: prestationMap[d.id] ? [prestationMap[d.id]] : [],
+          dossier_details_rc: rcMap[d.id] ? [rcMap[d.id]] : [],
+          has_been_sent_to_finance: wasSent,
+          has_quittance_transferred: quittanceDone,
+          // Un dossier est "envoyé sans quittance" s'il a été envoyé à Finance MAIS que la quittance n'est pas encore transférée
+          is_envoye_sans_quittance: wasSent && !quittanceDone,
+          // Un dossier est "en cours" s'il n'a pas encore été envoyé à Finance
+          is_en_cours_presta: !wasSent
+        }
+      }).filter(d => {
+        // Optionnel : On peut cacher les dossiers qui sont à la fois envoyés ET ont la quittance transférée
+        // (Car la prestation a fini son travail sur ces dossiers)
+        if (d.has_been_sent_to_finance && d.has_quittance_transferred) return false
+        return true
+      })
+
+      console.log(' [PrestationDashboard] Dossiers fusionnés :', merged.length)
       setDossiers(merged)
     } catch (err) {
       console.error(' [PrestationDashboard] Erreur lors du chargement:', err)
@@ -166,13 +214,13 @@ export default function PrestationDashboard() {
    */
   const openEditModal = (dossier) => {
     if (dossier.etat === 'ANNULE' || dossier.etat === 'CLOTURE') {
-      alert(' Impossible d\'éditer ce dossier : il est clôturé ou annulé.')
+      toast.error(' Impossible d\'éditer ce dossier : il est clôturé ou annulé.')
       return
     }
 
     // Vérification que le niveau est bien PRESTATION
     if (dossier.niveau !== 'PRESTATION') {
-      alert(' Impossible d\'éditer ce dossier : il n\'est plus au niveau PRESTATION.')
+      toast.error(' Impossible d\'éditer ce dossier : il n\'est plus au niveau PRESTATION.')
       return
     }
 
@@ -228,7 +276,7 @@ export default function PrestationDashboard() {
 
     // Vérification d'authentification
     if (!user || !user.id) {
-      alert(' Votre session a expiré. Veuillez vous reconnecter.')
+      toast.error(' Votre session a expiré. Veuillez vous reconnecter.')
       closeEditModal()
       navigate('/login')
       return
@@ -236,7 +284,7 @@ export default function PrestationDashboard() {
 
     // Vérification de sécurité : niveau doit être PRESTATION
     if (editingDossier.niveau !== 'PRESTATION') {
-      alert(' Impossible de modifier : le dossier n\'est plus au niveau PRESTATION.')
+      toast.error(' Impossible de modifier : le dossier n\'est plus au niveau PRESTATION.')
       closeEditModal()
       return
     }
@@ -355,11 +403,11 @@ export default function PrestationDashboard() {
         }
       }))
 
-      alert(' Dossier modifié avec succès !')
+      toast.success(' Dossier modifié avec succès !')
 
     } catch (err) {
       console.error(' [PrestationDashboard] Erreur lors de la modification:', err)
-      alert(` Erreur: ${err.message}`)
+      toast.error(` Erreur: ${err.message}`)
     } finally {
       setIsSaving(false)
     }
@@ -375,13 +423,13 @@ export default function PrestationDashboard() {
    */
   const handlePiecesATraiter = async (dossier) => {
     if (dossier.etat === 'ANNULE' || dossier.etat === 'CLOTURE') {
-      alert(' Ce dossier est clôturé ou annulé et n\'est plus accessible pour le traitement.')
+      toast.error(' Ce dossier est clôturé ou annulé et n\'est plus accessible pour le traitement.')
       return
     }
 
     // Vérification d'authentification
     if (!user || !user.id) {
-      alert(' Votre session a expiré. Veuillez vous reconnecter.')
+      toast.error(' Votre session a expiré. Veuillez vous reconnecter.')
       navigate('/login')
       return
     }
@@ -389,71 +437,90 @@ export default function PrestationDashboard() {
     // Vérification que le document est complet
     const detailsPrestation = dossier.dossier_details_prestation?.[0] || {}
     if (!detailsPrestation.document_complet) {
-      alert(' Le document doit être marqué comme complet pour traiter les pièces.')
+      toast.error(' Le document doit être marqué comme complet pour traiter les pièces.')
       return
     }
 
+    const isEnInstance = dossier.etat === 'EN_INSTANCE'
+    const newEtat = isEnInstance ? 'EN_COURS' : 'EN_INSTANCE'
+    const title = isEnInstance ? 'Annuler le traitement' : 'Pièces à traiter'
+    const message = isEnInstance
+      ? `Voulez-vous annuler le traitement des pièces du dossier "${dossier.souscripteur}" ?\n\nLe dossier repassera en cours.`
+      : `Voulez-vous marquer les pièces du dossier "${dossier.souscripteur}" comme "à traiter" ?\n\nLe dossier passera en instance.`
+
     // Confirmation
-    const confirmAction = window.confirm(
-      `Voulez-vous marquer les pièces du dossier "${dossier.souscripteur}" comme "à traiter" ?\n\nLe dossier passera en instance.`
-    )
+    setConfirmConfig({
+      isOpen: true,
+      title: title,
+      message: message,
+      type: 'warning',
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }))
+        setIsSaving(true)
 
-    if (!confirmAction) return
+        try {
+          console.log(' [PrestationDashboard] Début du basculement des pièces pour dossier #', dossier.id)
+          
+          const oldEtat = dossier.etat
 
-    setIsSaving(true)
+          // ─────────────────────────────────────────────────────────────
+          // ÉTAPE 1 : Mise à jour de l'état du dossier
+          // ─────────────────────────────────────────────────────────────
+          console.log(` [PrestationDashboard] Étape 1 : Mise à jour de l'état à ${newEtat}`)
+          
+          const { error: dossierError } = await supabase
+            .from('dossiers')
+            .update({
+              etat: newEtat,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', dossier.id)
 
-    try {
-      console.log(' [PrestationDashboard] Début du traitement des pièces pour dossier #', dossier.id)
-      
-      const oldEtat = dossier.etat
+          if (dossierError) {
+            console.error(' [PrestationDashboard] Erreur mise à jour état:', dossierError)
+            throw new Error(`Erreur lors de la mise à jour de l'état: ${dossierError.message}`)
+          }
 
-      // ─────────────────────────────────────────────────────────────
-      // ÉTAPE 1 : Mise à jour de l'état du dossier à EN_INSTANCE
-      // ─────────────────────────────────────────────────────────────
-      console.log(' [PrestationDashboard] Étape 1 : Mise à jour de l\'état à EN_INSTANCE')
-      
-      const { error: dossierError } = await supabase
-        .from('dossiers')
-        .update({
-          etat: 'EN_INSTANCE',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', dossier.id)
+          console.log(` [PrestationDashboard] État mis à jour à ${newEtat}`)
 
-      if (dossierError) {
-        console.error(' [PrestationDashboard] Erreur mise à jour état:', dossierError)
-        throw new Error(`Erreur lors de la mise à jour de l'état: ${dossierError.message}`)
+          // ─────────────────────────────────────────────────────────────
+          // ÉTAPE 2 : Ajout dans l'historique des actions
+          // ─────────────────────────────────────────────────────────────
+          const actionType = isEnInstance ? 'ANNULATION_TRAITEMENT' : 'PIECE_TRANSFEREE'
+          const actionDescription = isEnInstance 
+            ? `Annulation du traitement des pièces - État: ${oldEtat} → ${newEtat}`
+            : `Pièces transférées pour traitement - État: ${oldEtat} → ${newEtat}`
+
+          await logAction(
+            dossier.id,
+            actionType,
+            oldEtat,
+            newEtat,
+            actionDescription
+          )
+
+          // ─────────────────────────────────────────────────────────────
+          // SUCCÈS : Rechargement des données
+          // ─────────────────────────────────────────────────────────────
+          // Mise à jour locale immédiate de l'état
+          setDossiers(prev => prev.map(d =>
+            d.id === dossier.id ? { ...d, etat: newEtat } : d
+          ))
+
+          if (isEnInstance) {
+            toast.success(' Traitement des pièces annulé. Le dossier est de nouveau en cours.')
+          } else {
+            toast.success(' Pièces marquées pour traitement. Le dossier est en instance.')
+          }
+
+        } catch (err) {
+          console.error(' [PrestationDashboard] Erreur lors du traitement des pièces:', err)
+          toast.error(` Erreur: ${err.message}`)
+        } finally {
+          setIsSaving(false)
+        }
       }
-
-      console.log(' [PrestationDashboard] État mis à jour à EN_INSTANCE')
-
-      // ─────────────────────────────────────────────────────────────
-      // ÉTAPE 2 : Ajout dans l'historique des actions
-      // ─────────────────────────────────────────────────────────────
-      await logAction(
-        dossier.id,
-        'PIECE_TRANSFEREE',
-        oldEtat,
-        'EN_INSTANCE',
-        `Pièces transférées pour traitement - État: ${oldEtat} → EN_INSTANCE`
-      )
-
-      // ─────────────────────────────────────────────────────────────
-      // SUCCÈS : Rechargement des données
-      // ─────────────────────────────────────────────────────────────
-      // Mise à jour locale immédiate de l'état
-      setDossiers(prev => prev.map(d =>
-        d.id === dossier.id ? { ...d, etat: 'EN_INSTANCE' } : d
-      ))
-
-      alert(' Pièces marquées pour traitement. Le dossier est en instance.')
-
-    } catch (err) {
-      console.error(' [PrestationDashboard] Erreur lors du traitement des pièces:', err)
-      alert(` Erreur: ${err.message}`)
-    } finally {
-      setIsSaving(false)
-    }
+    })
   }
 
   /**
@@ -464,91 +531,111 @@ export default function PrestationDashboard() {
    */
   const handleEnvoyerFinance = async (dossier) => {
     if (dossier.etat === 'ANNULE' || dossier.etat === 'CLOTURE') {
-      alert(' Ce dossier est clôturé ou annulé et n\'est plus accessible pour le traitement.')
+      toast.error(' Ce dossier est clôturé ou annulé et n\'est plus accessible pour le traitement.')
       return
     }
 
     // Vérification d'authentification
     if (!user || !user.id) {
-      alert(' Votre session a expiré. Veuillez vous reconnecter.')
+      toast.error(' Votre session a expiré. Veuillez vous reconnecter.')
       navigate('/login')
       return
     }
 
     if (dossier.etat !== 'EN_INSTANCE') {
-      alert(' Vous devez d\'abord cliquer sur "Pièces à traiter".')
+      toast.error(' Vous devez d\'abord cliquer sur "Pièces à traiter".')
       return
     }
 
-    const confirmAction = window.confirm(
-      `Envoyer le dossier "${dossier.souscripteur}" au service Finance ?\n\nCette action notifiera l\'équipe Finance.`
-    )
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Envoyer au service Finance',
+      message: `Envoyer le dossier "${dossier.souscripteur}" au service Finance ?\n\nCette action notifiera l\'équipe Finance.`,
+      type: 'warning',
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }))
+        setIsSaving(true)
 
-    if (!confirmAction) return
+        try {
+          console.log(' [PrestationDashboard] Envoi dossier au service Finance #', dossier.id)
 
-    setIsSaving(true)
+          const { error: updateError } = await supabase
+            .from('dossiers')
+            .update({ 
+              updated_at: new Date().toISOString() 
+            })
+            .eq('id', dossier.id)
 
-    try {
-      console.log(' [PrestationDashboard] Envoi dossier au service Finance #', dossier.id)
+          if (updateError) {
+            console.error(' [PrestationDashboard] Erreur mise à jour dossier:', updateError)
+            throw new Error(`Erreur lors de l\'envoi: ${updateError.message}`)
+          }
 
-      const { error: updateError } = await supabase
-        .from('dossiers')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', dossier.id)
+          const { data: usersToNotify, error: usersError } = await supabase
+            .from('users')
+            .select(`
+              id,
+              email,
+              full_name,
+              roles!inner (
+                name
+              )
+            `)
+            .eq('roles.name', 'FINANCE')
 
-      if (updateError) {
-        console.error(' [PrestationDashboard] Erreur mise à jour dossier:', updateError)
-        throw new Error(`Erreur lors de l\'envoi: ${updateError.message}`)
-      }
+          if (usersError) {
+            console.error(' [PrestationDashboard] Erreur récupération Finance:', usersError)
+          } else if (usersToNotify && usersToNotify.length > 0) {
+            const notifications = usersToNotify.map(userToNotify => ({
+              user_id: userToNotify.id,
+              dossier_id: dossier.id,
+              type: 'DOSSIER_ENVOYE_FINANCE',
+              message: `Dossier envoyé au service Finance : ${dossier.souscripteur}`,
+              is_read: false,
+              created_at: new Date().toISOString()
+            }))
 
-      const { data: usersToNotify, error: usersError } = await supabase
-        .from('users')
-        .select(`
-          id,
-          email,
-          full_name,
-          roles!inner (
-            name
+            const { error: notifError } = await supabase
+              .from('notifications')
+              .insert(notifications)
+
+            if (notifError) {
+              console.error(' [PrestationDashboard] Erreur insertion notifications:', notifError)
+            }
+          }
+
+          await logAction(
+            dossier.id,
+            'ENVOI_FINANCE',
+            dossier.etat,
+            dossier.etat,
+            'Dossier envoyé au service Finance'
           )
-        `)
-        .eq('roles.name', 'FINANCE')
 
-      if (usersError) {
-        console.error(' [PrestationDashboard] Erreur récupération Finance:', usersError)
-      } else if (usersToNotify && usersToNotify.length > 0) {
-        const notifications = usersToNotify.map(userToNotify => ({
-          user_id: userToNotify.id,
-          dossier_id: dossier.id,
-          type: 'DOSSIER_ENVOYE_FINANCE',
-          message: `Dossier envoyé au service Finance : ${dossier.souscripteur}`,
-          is_read: false,
-          created_at: new Date().toISOString()
-        }))
+          // Mise à jour locale
+          setDossiers(prev => prev.map(d => {
+            if (d.id === dossier.id) {
+              const newHasSent = true
+              const newHasQuittance = d.has_quittance_transferred
+              return { 
+                ...d, 
+                has_been_sent_to_finance: newHasSent,
+                is_envoye_sans_quittance: newHasSent && !newHasQuittance,
+                is_en_cours_presta: !newHasSent
+              }
+            }
+            return d
+          }).filter(d => !(d.has_been_sent_to_finance && d.has_quittance_transferred)))
 
-        const { error: notifError } = await supabase
-          .from('notifications')
-          .insert(notifications)
-
-        if (notifError) {
-          console.error(' [PrestationDashboard] Erreur insertion notifications:', notifError)
+          toast.success(' Dossier envoyé au service Finance.')
+        } catch (err) {
+          console.error(' [PrestationDashboard] Erreur lors de l\'envoi Finance:', err)
+          toast.error(` Erreur: ${err.message}`)
+        } finally {
+          setIsSaving(false)
         }
       }
-
-      await logAction(
-        dossier.id,
-        'ENVOI_FINANCE',
-        dossier.etat,
-        dossier.etat,
-        'Dossier envoyé au service Finance'
-      )
-
-      alert(' Dossier envoyé au service Finance.')
-    } catch (err) {
-      console.error(' [PrestationDashboard] Erreur lors de l\'envoi Finance:', err)
-      alert(` Erreur: ${err.message}`)
-    } finally {
-      setIsSaving(false)
-    }
+    })
   }
 
   /**
@@ -562,13 +649,13 @@ export default function PrestationDashboard() {
    */
   const handleTransfertQuittance = async (dossier) => {
     if (dossier.etat === 'ANNULE' || dossier.etat === 'CLOTURE') {
-      alert(' Ce dossier est clôturé ou annulé et n\'est plus accessible pour le traitement.')
+      toast.error(' Ce dossier est clôturé ou annulé et n\'est plus accessible pour le traitement.')
       return
     }
 
     // Vérification d'authentification
     if (!user || !user.id) {
-      alert(' Votre session a expiré. Veuillez vous reconnecter.')
+      toast.error(' Votre session a expiré. Veuillez vous reconnecter.')
       navigate('/login')
       return
     }
@@ -576,96 +663,113 @@ export default function PrestationDashboard() {
     // Vérification que le document est complet ET quittance_signee est true
     const detailsPrestation = dossier.dossier_details_prestation?.[0] || {}
     if (!detailsPrestation.document_complet || !detailsPrestation.quittance_signee) {
-      alert(' Le document doit être complet et la quittance signée pour transférer au service Finance.')
+      toast.error(' Le document doit être complet et la quittance signée pour transférer au service Finance.')
       return
     }
 
-    // Confirmation
-    const confirmAction = window.confirm(
-      `Voulez-vous notifier le service Finance du transfert de la quittance signée du dossier "${dossier.souscripteur}" ?\n\nLe dossier restera en instance chez Prestation jusqu'à validation par Finance.`
-    )
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Confirmer le transfert',
+      message: `Confirmer le transfert physique de la quittance signée pour le dossier "${dossier.souscripteur}" ?`,
+      type: 'warning',
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }))
+        setIsSaving(true)
 
-    if (!confirmAction) return
+        try {
+          console.log(' [PrestationDashboard] Début du transfert de quittance pour dossier #', dossier.id)
+          
+          const currentEtat = dossier.etat
 
-    setIsSaving(true)
+          // ─────────────────────────────────────────────────────────────
+          // NOTE : Le niveau reste PRESTATION — la validation Finance
+          // (depuis l'interface Finance) est ce qui fera passer le
+          // dossier au niveau FINANCE (étapes 8-9 du workflow)
+          // ─────────────────────────────────────────────────────────────
 
-    try {
-      console.log(' [PrestationDashboard] Début du transfert de quittance pour dossier #', dossier.id)
-      
-      const currentEtat = dossier.etat
+          // ─────────────────────────────────────────────────────────────
+          // ÉTAPE 1 : Récupération des utilisateurs FINANCE
+          // ─────────────────────────────────────────────────────────────
+          console.log(' [PrestationDashboard] Étape 1 : Récupération des utilisateurs FINANCE à notifier')
+          
+          const { data: usersToNotify, error: usersError } = await supabase
+            .from('users')
+            .select(`
+              id,
+              email,
+              full_name,
+              roles!inner (
+                name
+              )
+            `)
+            .eq('roles.name', 'FINANCE')
 
-      // ─────────────────────────────────────────────────────────────
-      // NOTE : Le niveau reste PRESTATION — la validation Finance
-      // (depuis l'interface Finance) est ce qui fera passer le
-      // dossier au niveau FINANCE (étapes 8-9 du workflow)
-      // ─────────────────────────────────────────────────────────────
-
-      // ─────────────────────────────────────────────────────────────
-      // ÉTAPE 1 : Récupération des utilisateurs FINANCE
-      // ─────────────────────────────────────────────────────────────
-      console.log(' [PrestationDashboard] Étape 1 : Récupération des utilisateurs FINANCE à notifier')
-      
-      const { data: usersToNotify, error: usersError } = await supabase
-        .from('users')
-        .select(`
-          id,
-          email,
-          full_name,
-          roles!inner (
-            name
-          )
-        `)
-        .eq('roles.name', 'FINANCE')
-
-      if (usersError) {
-        console.error(' [PrestationDashboard] Erreur récupération utilisateurs:', usersError)
-        // On continue même si ça échoue
-      } else {
-        console.log(' [PrestationDashboard] Utilisateurs FINANCE à notifier:', usersToNotify?.length || 0)
-        
-        // Création des notifications pour chaque utilisateur FINANCE
-        if (usersToNotify && usersToNotify.length > 0) {
-          const notifications = usersToNotify.map(userToNotify => ({
-            user_id: userToNotify.id,
-            dossier_id: dossier.id,
-            type: 'QUITTANCE_TRANSFEREE',
-            message: `Quittance transférée pour le dossier de ${dossier.souscripteur}`,
-            is_read: false,
-            created_at: new Date().toISOString()
-          }))
-
-          const { error: notifError } = await supabase
-            .from('notifications')
-            .insert(notifications)
-
-          if (notifError) {
-            console.error(' [PrestationDashboard] Erreur insertion notifications:', notifError)
+          if (usersError) {
+            console.error(' [PrestationDashboard] Erreur récupération utilisateurs:', usersError)
             // On continue même si ça échoue
           } else {
-            console.log(' [PrestationDashboard] Notifications créées pour Finance')
+            console.log(' [PrestationDashboard] Utilisateurs FINANCE à notifier:', usersToNotify?.length || 0)
+            
+            // Création des notifications pour chaque utilisateur FINANCE
+            if (usersToNotify && usersToNotify.length > 0) {
+              const notifications = usersToNotify.map(userToNotify => ({
+                user_id: userToNotify.id,
+                dossier_id: dossier.id,
+                type: 'QUITTANCE_TRANSFEREE',
+                message: `Quittance transférée pour le dossier de ${dossier.souscripteur}`,
+                is_read: false,
+                created_at: new Date().toISOString()
+              }))
+
+              const { error: notifError } = await supabase
+                .from('notifications')
+                .insert(notifications)
+
+              if (notifError) {
+                console.error(' [PrestationDashboard] Erreur insertion notifications:', notifError)
+                // On continue même si ça échoue
+              } else {
+                console.log(' [PrestationDashboard] Notifications créées pour Finance')
+              }
+            }
           }
+
+          // ─────────────────────────────────────────────────────────────
+          // ÉTAPE 2 : Ajout dans l'historique des actions
+          // ─────────────────────────────────────────────────────────────
+          await logAction(
+            dossier.id,
+            'QUITTANCE_TRANSFEREE',
+            currentEtat,
+            currentEtat,
+            `Quittance signée transférée physiquement au service Finance - en attente de validation`
+          )
+
+          // Mise à jour locale
+          setDossiers(prev => prev.map(d => {
+            if (d.id === dossier.id) {
+              const newHasSent = d.has_been_sent_to_finance
+              const newHasQuittance = true
+              return { 
+                ...d, 
+                has_quittance_transferred: newHasQuittance,
+                is_envoye_sans_quittance: newHasSent && !newHasQuittance,
+                is_en_cours_presta: !newHasSent
+              }
+            }
+            return d
+          }).filter(d => !(d.has_been_sent_to_finance && d.has_quittance_transferred)))
+
+          toast.success(' Quittance transférée au service Finance ! L\'équipe a été notifiée. Le dossier reste en instance jusqu\'à validation par Finance.')
+
+        } catch (err) {
+          console.error(' [PrestationDashboard] Erreur lors du transfert de quittance:', err)
+          toast.error(` Erreur: ${err.message}`)
+        } finally {
+          setIsSaving(false)
         }
       }
-
-      // ─────────────────────────────────────────────────────────────
-      // ÉTAPE 2 : Ajout dans l'historique des actions
-      // ─────────────────────────────────────────────────────────────
-      await logAction(
-        dossier.id,
-        'QUITTANCE_TRANSFEREE',
-        currentEtat,
-        currentEtat,
-        `Quittance signée transférée physiquement au service Finance - en attente de validation`
-      )
-
-      alert(' Quittance transférée au service Finance ! L\'équipe a été notifiée. Le dossier reste en instance jusqu\'à validation par Finance.')
-
-    } catch (err) {
-      console.error(' [PrestationDashboard] Erreur lors du transfert de quittance:', err)
-      alert(` Erreur: ${err.message}`)
-    } finally {
-      setIsSaving(false)
-    }
+    })
   }
 
   /**
@@ -804,6 +908,12 @@ export default function PrestationDashboard() {
     return true
   })
 
+  const dossiersEnCours = filteredDossiers.filter(d => d.is_en_cours_presta)
+  const dossiersEnvoyesSansQuittance = filteredDossiers.filter(d => d.is_envoye_sans_quittance)
+
+  let displayedDossiers = dossiersEnCours
+  if (activeTab === 'envoyes') displayedDossiers = dossiersEnvoyesSansQuittance
+
   const getDateReception = (dossier) => {
     const detailsRC = dossier.dossier_details_rc?.[0] || {}
     return formatDate(detailsRC.date_reception, dossier.created_at)
@@ -909,7 +1019,7 @@ export default function PrestationDashboard() {
 
     const printWindow = window.open('', '_blank', 'width=1000,height=700')
     if (!printWindow) {
-      alert('Impossible d\'ouvrir la fenetre d\'export PDF.')
+      toast.error('Impossible d\'ouvrir la fenetre d\'export PDF.')
       return
     }
 
@@ -924,7 +1034,7 @@ export default function PrestationDashboard() {
 
   const handleExport = () => {
     if (!filteredDossiers.length) {
-      alert('Aucun dossier a exporter.')
+      toast.error('Aucun dossier a exporter.')
       return
     }
 
@@ -1145,6 +1255,30 @@ export default function PrestationDashboard() {
             )}
           </div>
 
+        {/* Onglets de statut */}
+        <div className="flex space-x-1 bg-gray-100/50 p-1 rounded-xl mb-6 self-start">
+          <button
+            onClick={() => setActiveTab('en_cours')}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === 'en_cours'
+                ? 'bg-white text-comar-navy shadow-sm'
+                : 'text-gray-500 hover:text-comar-navy hover:bg-gray-200/50'
+            }`}
+          >
+            Dossiers en cours ({dossiersEnCours.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('envoyes')}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === 'envoyes'
+                ? 'bg-white text-comar-navy shadow-sm'
+                : 'text-gray-500 hover:text-comar-navy hover:bg-gray-200/50'
+            }`}
+          >
+            Envoyés sans quittance ({dossiersEnvoyesSansQuittance.length})
+          </button>
+        </div>
+
         {/* Message si aucun dossier */}
         {dossiers.length === 0 ? (
           <div className="bg-white rounded-xl border border-comar-neutral-border p-12 text-center">
@@ -1152,7 +1286,7 @@ export default function PrestationDashboard() {
             <h3 className="text-xl font-semibold text-comar-navy mb-2">Aucun dossier prestation</h3>
             <p className="text-gray-600">Aucun dossier n'est actuellement au niveau PRESTATION.</p>
           </div>
-        ) : filteredDossiers.length === 0 ? (
+        ) : displayedDossiers.length === 0 ? (
           <div className="bg-white rounded-xl border border-comar-neutral-border p-12 text-center">
             <div className="w-16 h-16 rounded-2xl bg-amber-50 flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
@@ -1194,7 +1328,7 @@ export default function PrestationDashboard() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-comar-neutral-border">
-                  {filteredDossiers.map((dossier) => {
+                  {displayedDossiers.map((dossier) => {
                     // Extraction des données jointes (peut être null/undefined)
                     const detailsRC = dossier.dossier_details_rc?.[0] || {}
                     const detailsPrestation = dossier.dossier_details_prestation?.[0] || {}
@@ -1263,90 +1397,124 @@ export default function PrestationDashboard() {
                         {/* Actions */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <div className="flex gap-2">
-                            <button
-                              onClick={() => openEditModal(dossier)}
-                              disabled={!canEdit}
-                              className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${
-                                canEdit
-                                  ? 'bg-comar-navy text-white hover:bg-comar-navy-light'
-                                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              }`}
-                              title={
-                                !isNiveauPrestation
-                                  ? 'Le dossier n\'est plus au niveau PRESTATION'
-                                  : isLocked
-                                  ? 'Dossier clôturé ou annulé'
-                                  : 'Traiter le dossier'
-                              }
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" /></svg>
-                              Traiter
-                            </button>
-                            <button
-                              onClick={() => handlePiecesATraiter(dossier)}
-                              disabled={!canMarkPieces}
-                              className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${
-                                canMarkPieces
-                                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              }`}
-                              title={
-                                !isNiveauPrestation
-                                  ? 'Le dossier n\'est plus au niveau PRESTATION'
-                                  : isLocked
-                                  ? 'Dossier clôturé ou annulé'
-                                  : !isDocumentComplet
-                                  ? 'Le document doit être marqué comme complet'
-                                  : 'Marquer les pièces comme à traiter'
-                              }
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                              Pièces à traiter
-                            </button>
-                            <button
-                              onClick={() => handleTransfertQuittance(dossier)}
-                              disabled={!canTransferQuittance}
-                              className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${
-                                canTransferQuittance
-                                  ? 'bg-violet-600 text-white hover:bg-violet-700'
-                                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              }`}
-                              title={
-                                !isNiveauPrestation
-                                  ? 'Le dossier n\'est plus au niveau PRESTATION'
-                                  : isLocked
-                                  ? 'Dossier clôturé ou annulé'
-                                  : !isDocumentComplet
-                                  ? 'Le document doit être marqué comme complet'
-                                  : !isQuittanceSignee
-                                  ? 'La quittance doit être signée'
-                                  : 'Transférer la quittance au service Finance'
-                              }
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 16.5L16.5 7.5M16.5 7.5H9.75M16.5 7.5v6.75" /></svg>
-                              Transfert quittance
-                            </button>
-                            <button
-                              onClick={() => handleEnvoyerFinance(dossier)}
-                              disabled={!canEnvoyerFinance}
-                              className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${
-                                canEnvoyerFinance
-                                  ? 'bg-comar-navy text-white hover:bg-comar-navy-light'
-                                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              }`}
-                              title={
-                                !isNiveauPrestation
-                                  ? 'Le dossier n\'est plus au niveau PRESTATION'
-                                  : isLocked
-                                  ? 'Dossier clôturé ou annulé'
-                                  : dossier.etat !== 'EN_INSTANCE'
-                                  ? 'Cliquez d\'abord sur "Pièces à traiter"'
-                                  : 'Envoyer le dossier au service Finance'
-                              }
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
-                              Envoyer
-                            </button>
+                            {activeTab === 'en_cours' ? (
+                              <>
+                                <button
+                                  onClick={() => openEditModal(dossier)}
+                                  disabled={!canEdit}
+                                  className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${
+                                    canEdit
+                                      ? 'bg-comar-navy text-white hover:bg-comar-navy-light'
+                                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                  }`}
+                                  title={
+                                    !isNiveauPrestation
+                                      ? 'Le dossier n\'est plus au niveau PRESTATION'
+                                      : isLocked
+                                      ? 'Dossier clôturé ou annulé'
+                                      : 'Traiter le dossier'
+                                  }
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" /></svg>
+                                  Traiter
+                                </button>
+                                <button
+                                  onClick={() => handlePiecesATraiter(dossier)}
+                                  disabled={!canMarkPieces}
+                                  className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${
+                                    canMarkPieces
+                                      ? dossier.etat === 'EN_INSTANCE'
+                                        ? 'bg-amber-500 text-white hover:bg-amber-600'
+                                        : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                  }`}
+                                  title={
+                                    !isNiveauPrestation
+                                      ? 'Le dossier n\'est plus au niveau PRESTATION'
+                                      : isLocked
+                                      ? 'Dossier clôturé ou annulé'
+                                      : !isDocumentComplet
+                                      ? 'Le document doit être marqué comme complet'
+                                      : dossier.etat === 'EN_INSTANCE'
+                                      ? 'Annuler le traitement des pièces'
+                                      : 'Marquer les pièces comme à traiter'
+                                  }
+                                >
+                                  {dossier.etat === 'EN_INSTANCE' ? (
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" /></svg>
+                                  ) : (
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                  )}
+                                  {dossier.etat === 'EN_INSTANCE' ? 'Annuler traitement' : 'Pièces à traiter'}
+                                </button>
+                                <button
+                                  onClick={() => handleEnvoyerFinance(dossier)}
+                                  disabled={!canEnvoyerFinance}
+                                  className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${
+                                    canEnvoyerFinance
+                                      ? 'bg-comar-navy text-white hover:bg-comar-navy-light'
+                                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                  }`}
+                                  title={
+                                    !isNiveauPrestation
+                                      ? 'Le dossier n\'est plus au niveau PRESTATION'
+                                      : isLocked
+                                      ? 'Dossier clôturé ou annulé'
+                                      : dossier.etat !== 'EN_INSTANCE'
+                                      ? 'Cliquez d\'abord sur "Pièces à traiter"'
+                                      : 'Envoyer le dossier au service Finance'
+                                  }
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
+                                  Envoyer
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => openEditModal(dossier)}
+                                  disabled={!canEdit}
+                                  className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${
+                                    canEdit
+                                      ? 'bg-comar-navy text-white hover:bg-comar-navy-light'
+                                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                  }`}
+                                  title={
+                                    !isNiveauPrestation
+                                      ? 'Le dossier n\'est plus au niveau PRESTATION'
+                                      : isLocked
+                                      ? 'Dossier clôturé ou annulé'
+                                      : 'Traiter le dossier'
+                                  }
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" /></svg>
+                                  Traiter
+                                </button>
+                                <button
+                                  onClick={() => handleTransfertQuittance(dossier)}
+                                  disabled={!canTransferQuittance}
+                                  className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-bold ${
+                                    canTransferQuittance
+                                      ? 'bg-violet-600 text-white hover:bg-violet-700 shadow-md'
+                                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                  }`}
+                                  title={
+                                    !isNiveauPrestation
+                                      ? 'Le dossier n\'est plus au niveau PRESTATION'
+                                      : isLocked
+                                      ? 'Dossier clôturé ou annulé'
+                                      : !isDocumentComplet
+                                      ? 'Le document doit être marqué comme complet'
+                                      : !isQuittanceSignee
+                                      ? 'La quittance doit être signée'
+                                      : 'Transférer la quittance au service Finance'
+                                  }
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 16.5L16.5 7.5M16.5 7.5H9.75M16.5 7.5v6.75" /></svg>
+                                  Transfert quittance
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1360,7 +1528,7 @@ export default function PrestationDashboard() {
             <div className="bg-comar-neutral-bg px-6 py-4 border-t border-comar-neutral-border">
               <div className="flex justify-between items-center text-sm text-gray-600">
                 <span>
-                  Total : <span className="font-semibold text-gray-900">{filteredDossiers.length}</span> dossier{filteredDossiers.length > 1 ? 's' : ''}
+                  Total : <span className="font-semibold text-gray-900">{displayedDossiers.length}</span> dossier{displayedDossiers.length > 1 ? 's' : ''}
                 </span>
                 <span className="text-xs text-gray-500">
                   Dernière mise à jour : {new Date().toLocaleTimeString('fr-FR')}
@@ -1605,6 +1773,15 @@ export default function PrestationDashboard() {
           </div>
         )}
       </div>
+
+      <ConfirmModal 
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        type={confirmConfig.type}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+      />
     </PrestationLayout>
   )
 }

@@ -119,154 +119,160 @@ export default function AgencesList() {
 
   return (
     <AdminLayout>
-      <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-comar-navy">Gestion des Agences</h1>
-        <Button
-          onClick={() => {
-            setShowForm(!showForm)
-            setError(null)
-            setSuccess(null)
-          }}
-          variant={showForm ? 'secondary' : 'primary'}
-        >
-          {showForm ? 'Annuler' : '+ Nouvelle Agence'}
-        </Button>
-      </div>
-
-      {/* Messages de succès/erreur */}
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="mb-4 p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg">
-          {success}
-        </div>
-      )}
-
-      {/* Formulaire d'ajout */}
-      {showForm && (
-        <div className="bg-white rounded-xl p-6 mb-6 border border-comar-neutral-border">
-          <h2 className="text-xl font-semibold mb-4 text-comar-navy">Nouvelle Agence</h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                label="Code de l'agence"
-                type="text"
-                name="code"
-                placeholder="Ex: PAR01"
-                value={formData.code}
-                onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                required
-                maxLength={10}
-              />
-
-              <Input
-                label="Nom de l'agence"
-                type="text"
-                name="nom"
-                placeholder="Ex: Agence Paris Centre"
-                value={formData.nom}
-                onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <Button type="submit" variant="primary">
-                Créer l'Agence
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  setShowForm(false)
-                  setFormData({ code: '', nom: '' })
-                }}
-              >
-                Annuler
-              </Button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Liste des agences */}
-      {agences.length === 0 ? (
-        <div className="bg-white rounded-xl p-12 text-center border border-comar-neutral-border">
-          <div className="text-gray-400 mb-2">
-            <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
+      <div className="p-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-2xl font-extrabold text-comar-navy">Gestion des Agences</h1>
+            <p className="text-sm text-gray-500">Configurez les points de vente COMAR Assurances</p>
           </div>
-          <p className="text-gray-500 text-lg">Aucune agence trouvée</p>
-          <p className="text-gray-400 text-sm mt-2">Cliquez sur "Nouvelle Agence" pour en créer une</p>
+          <Button
+            onClick={() => {
+              setShowForm(!showForm)
+              setError(null)
+              setSuccess(null)
+            }}
+            className={`px-6 py-3 rounded-xl transition shadow-lg flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-widest ${
+              showForm 
+                ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' 
+                : 'bg-comar-navy text-white hover:bg-comar-navy-light shadow-comar-navy/20'
+            }`}
+          >
+            {showForm ? 'Annuler' : '+ Nouvelle Agence'}
+          </Button>
         </div>
-      ) : (
-        <div className="bg-white rounded-xl overflow-hidden border border-comar-neutral-border">
-          <table className="min-w-full divide-y divide-comar-neutral-border">
-            <thead className="bg-comar-navy">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
-                  Code
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
-                  Nom de l'agence
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
-                  Date de création
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-white/80 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-comar-neutral-border">
-              {agences.map((agence) => (
-                <tr key={agence.id} className="hover:bg-comar-navy-50/30 transition-colors duration-150">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-comar-navy-50 text-comar-navy">
-                        {agence.code}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{agence.nom}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      {agence.created_at && new Date(agence.created_at).toLocaleDateString('fr-FR', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => handleDelete(agence.id, agence.code)}
-                      className="text-red-600 hover:text-red-900 hover:underline transition"
-                    >
-                      Supprimer
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
 
-      {/* Compteur */}
-      {agences.length > 0 && (
-        <div className="mt-4 text-sm text-gray-500 text-center">
-          {agences.length} agence{agences.length > 1 ? 's' : ''} au total
-        </div>
-      )}
+        {/* Messages de succès/erreur */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-center gap-3 animate-shake">
+            <span className="text-xl">⚠️</span>
+            <span className="text-sm font-medium">{error}</span>
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl flex items-center gap-3 animate-fade-in">
+            <span className="text-xl">✅</span>
+            <span className="text-sm font-medium">{success}</span>
+          </div>
+        )}
+
+        {/* Formulaire d'ajout */}
+        {showForm && (
+          <div className="bg-white rounded-2xl p-6 mb-8 border border-comar-neutral-border shadow-sm animate-slide-down">
+            <h2 className="text-lg font-bold mb-4 text-comar-navy">Détails de la nouvelle agence</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input
+                  label="Code de l'agence"
+                  type="text"
+                  name="code"
+                  placeholder="Ex: PAR01"
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                  required
+                  maxLength={10}
+                  className="rounded-lg"
+                />
+
+                <Input
+                  label="Nom de l'agence"
+                  type="text"
+                  name="nom"
+                  placeholder="Ex: Agence Paris Centre"
+                  value={formData.nom}
+                  onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
+                  required
+                  className="rounded-lg"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  type="submit" 
+                  className="bg-comar-navy text-white px-6 py-2.5 rounded-xl hover:bg-comar-navy-light transition text-[11px] font-bold uppercase tracking-widest shadow-lg shadow-comar-navy/20"
+                >
+                  Créer l'Agence
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForm(false)
+                    setFormData({ code: '', nom: '' })
+                  }}
+                  className="bg-gray-100 text-gray-600 px-6 py-2.5 rounded-xl hover:bg-gray-200 transition text-[11px] font-bold uppercase tracking-widest"
+                >
+                  Annuler
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Liste des agences */}
+        {agences.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-comar-neutral-border p-12 text-center shadow-sm">
+            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            </div>
+            <p className="text-gray-500 font-medium">Aucune agence trouvée.</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-comar-neutral-border overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-comar-neutral-border">
+                <thead className="bg-comar-navy">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-[11px] font-bold text-white/70 uppercase tracking-widest">Code</th>
+                    <th className="px-6 py-4 text-left text-[11px] font-bold text-white/70 uppercase tracking-widest">Nom de l'agence</th>
+                    <th className="px-6 py-4 text-left text-[11px] font-bold text-white/70 uppercase tracking-widest">Création</th>
+                    <th className="px-6 py-4 text-right text-[11px] font-bold text-white/70 uppercase tracking-widest">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-comar-neutral-border">
+                  {agences.map((agence) => (
+                    <tr key={agence.id} className="hover:bg-comar-navy-50/30 transition-colors duration-150">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-comar-navy-50 text-comar-navy border border-comar-navy/10">
+                          {agence.code}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-semibold text-comar-navy">{agence.nom}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-xs text-gray-500 font-medium">
+                          {agence.created_at && new Date(agence.created_at).toLocaleDateString('fr-FR', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <button
+                          onClick={() => handleDelete(agence.id, agence.code)}
+                          className="px-4 py-2 text-[10px] font-bold rounded-lg bg-red-100 text-red-600 hover:bg-red-200 uppercase tracking-wider transition"
+                        >
+                          Supprimer
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+
+        {/* Compteur */}
+        {agences.length > 0 && (
+          <div className="mt-4 text-sm text-gray-500 text-center">
+            {agences.length} agence{agences.length > 1 ? 's' : ''} au total
+          </div>
+        )}
       </div>
     </AdminLayout>
   )

@@ -5,11 +5,13 @@ import RCLayout from '../components/RCLayout'
 import AdminLayout from '../components/AdminLayout'
 import PrestationLayout from '../components/PrestationLayout'
 import FinanceLayout from '../components/FinanceLayout'
+import ConfirmModal from '../components/ConfirmModal'
 
 export default function NotificationsPage() {
   const { user, role } = useAuth()
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', type: 'warning', onConfirm: null })
 
   useEffect(() => {
     if (user) {
@@ -57,13 +59,21 @@ export default function NotificationsPage() {
   }
 
   const clearAll = async () => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer toutes vos notifications ?")) return;
-    try {
-      await supabase.from('notifications').delete().eq('user_id', user.id)
-      setNotifications([])
-    } catch (err) {
-      console.error('Error deleting notifications:', err)
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Supprimer les notifications',
+      message: 'Êtes-vous sûr de vouloir supprimer toutes vos notifications ?',
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }))
+        try {
+          await supabase.from('notifications').delete().eq('user_id', user.id)
+          setNotifications([])
+        } catch (err) {
+          console.error('Error deleting notifications:', err)
+        }
+      }
+    })
   }
 
   const content = (
@@ -132,6 +142,15 @@ export default function NotificationsPage() {
           </div>
         )}
       </div>
+
+      <ConfirmModal 
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        type={confirmConfig.type}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   )
 

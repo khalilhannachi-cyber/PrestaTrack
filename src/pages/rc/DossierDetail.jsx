@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../contexts/AuthContext'
 // Layout spécifique aux pages Relation Client
 import RCLayout from '../../components/RCLayout'
+import ConfirmModal from '../../components/ConfirmModal'
 
 const POLICE_NUMBER_REGEX = /^\d{8}-\d$/
 
@@ -29,6 +30,7 @@ export default function DossierDetail() {
   const [saving, setSaving] = useState(false)
   const [editing, setEditing] = useState(false)
   const [agences, setAgences] = useState([])
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', type: 'warning', onConfirm: null })
 
   // Formulaire d'édition
   const [editForm, setEditForm] = useState({
@@ -153,56 +155,70 @@ export default function DossierDetail() {
     }
   }
 
-  // ── Transmettre à Prestation ──────────────────────────────────
   const handleTransmitToPrestation = async () => {
     if (dossier?.etat === 'ANNULE') {
       toast.error("Ce dossier est annulé et n'est plus transmissible.")
       return
     }
 
-    if (!window.confirm('Transmettre ce dossier au service Prestation ?\n\nCette action est irréversible.')) return
-    setTransmitting(true)
-    try {
-      const { error: updateError } = await supabase
-        .from('dossiers')
-        .update({ niveau: 'PRESTATION', updated_at: new Date().toISOString() })
-        .eq('id', id)
-      if (updateError) throw updateError
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Transmettre le dossier',
+      message: 'Transmettre ce dossier au service Prestation ?\n\nCette action est irréversible.',
+      type: 'warning',
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }))
+        setTransmitting(true)
+        try {
+          const { error: updateError } = await supabase
+            .from('dossiers')
+            .update({ niveau: 'PRESTATION', updated_at: new Date().toISOString() })
+            .eq('id', id)
+          if (updateError) throw updateError
 
-      await supabase.from('historique_actions').insert([{
-        dossier_id: parseInt(id), user_id: user.id,
-        action: 'Transmission à Prestation',
-        description: `Dossier transmis au service Prestation par ${user.email}`,
-        old_status: 'RELATION_CLIENT', new_status: 'PRESTATION'
-      }])
+          await supabase.from('historique_actions').insert([{
+            dossier_id: parseInt(id), user_id: user.id,
+            action: 'Transmission à Prestation',
+            description: `Dossier transmis au service Prestation par ${user.email}`,
+            old_status: 'RELATION_CLIENT', new_status: 'PRESTATION'
+          }])
 
-      toast.success("Dossier transmis au service Prestation !")
-      navigate('/rc/dossiers')
-    } catch (err) {
-      toast.error(`${err.message}`)
-    } finally {
-      setTransmitting(false)
-    }
+          toast.success("Dossier transmis au service Prestation !")
+          navigate('/rc/dossiers')
+        } catch (err) {
+          toast.error(`${err.message}`)
+        } finally {
+          setTransmitting(false)
+        }
+      }
+    })
   }
 
-  // ── Supprimer ─────────────────────────────────────────────────
   const handleDelete = async () => {
     if (dossier?.etat === 'ANNULE') {
       toast.error("Ce dossier est annulé et n'est plus supprimable depuis ce service.")
       return
     }
 
-    if (!window.confirm(`Supprimer définitivement le dossier de "${dossier.souscripteur}" ?\n\nCette action est irréversible.`)) return
-    try {
-      await supabase.from('historique_actions').delete().eq('dossier_id', id)
-      await supabase.from('dossier_details_rc').delete().eq('dossier_id', id)
-      const { error } = await supabase.from('dossiers').delete().eq('id', id)
-      if (error) throw error
-      toast.success("Dossier supprimé.")
-      navigate('/rc/dossiers')
-    } catch (err) {
-      toast.error(`Erreur : ${err.message}`)
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Supprimer le dossier',
+      message: `Supprimer définitivement le dossier de "${dossier.souscripteur}" ?\n\nCette action est irréversible.`,
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }))
+        try {
+          await supabase.from('historique_actions').delete().eq('dossier_id', id)
+          await supabase.from('dossier_details_rc').delete().eq('dossier_id', id)
+          const { error } = await supabase.from('dossiers').delete().eq('id', id)
+          if (error) throw error
+          toast.success("Dossier supprimé.")
+          navigate('/rc/dossiers')
+        } catch (err) {
+          toast.error(`Erreur : ${err.message}`)
+        }
+      }
+    })
   }
 
   const handleEditChange = (e) => {
@@ -447,6 +463,15 @@ export default function DossierDetail() {
             )}
           </div>
         </div>
+
+        <ConfirmModal 
+          isOpen={confirmConfig.isOpen}
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          type={confirmConfig.type}
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        />
       </div>
     </RCLayout>
   )

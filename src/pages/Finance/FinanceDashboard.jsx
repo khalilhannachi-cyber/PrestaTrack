@@ -10,6 +10,7 @@ import FinanceLayout from '../../components/FinanceLayout'
 // Utilitaire d'enregistrement des actions Finance
 import { logFinanceAction } from '../../lib/logFinanceAction'
 import { formatRequestNumber } from '../../lib/requestNumber'
+import ConfirmModal from '../../components/ConfirmModal'
 
 /**
  * Dashboard Finance
@@ -30,11 +31,13 @@ export default function FinanceDashboard() {
   const [loading, setLoading] = useState(true) // Indicateur de chargement
   const [error, setError] = useState(null) // Erreur éventuelle
   const [exportFormat, setExportFormat] = useState('excel')
+  const [activeTab, setActiveTab] = useState('actifs')
 
   // États pour la modal de conformité
   const [isConformiteModalOpen, setIsConformiteModalOpen] = useState(false)
   const [conformiteDossier, setConformiteDossier] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', type: 'warning', onConfirm: null })
   const [conformiteForm, setConformiteForm] = useState({
     conformite_validee: false,
     moyen_paiement: 'VIREMENT',
@@ -82,12 +85,6 @@ export default function FinanceDashboard() {
           agences (
             id,
             nom
-          ),
-          dossier_details_rc (
-            date_reception,
-            demande_initiale,
-            telephone,
-            motif_instance
           )
         `)
         .or('niveau.eq.FINANCE,etat.eq.EN_INSTANCE')
@@ -155,7 +152,19 @@ export default function FinanceDashboard() {
       }
 
       // ─────────────────────────────────────────────────────────────
-      // Fusion manuelle des trois ensembles de données
+      // Requête 4 : détails RC (contourne RLS JOIN)
+      // ─────────────────────────────────────────────────────────────
+      const { data: rcDetails, error: rcError } = await supabase
+        .from('dossier_details_rc')
+        .select('dossier_id, date_reception, demande_initiale, telephone, motif_instance')
+        .in('dossier_id', dossierIds)
+
+      if (rcError) {
+        console.warn(' [FinanceDashboard] Erreur détails RC :', rcError.message)
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // Fusion manuelle des quatre ensembles de données
       // ─────────────────────────────────────────────────────────────
       const prestationMap = {}
       if (prestationDetails) {
@@ -165,6 +174,11 @@ export default function FinanceDashboard() {
       const financeMap = {}
       if (financeDetails) {
         financeDetails.forEach((f) => { financeMap[f.dossier_id] = f })
+      }
+
+      const rcMap = {}
+      if (rcDetails) {
+        rcDetails.forEach((r) => { rcMap[r.dossier_id] = r })
       }
 
       const merged = dossiersData.map((d) => {
@@ -182,6 +196,7 @@ export default function FinanceDashboard() {
           ...d,
           dossier_details_prestation: prestation ? [prestation] : [],
           dossier_details_finance: finance ? [finance] : [],
+          dossier_details_rc: rcMap[d.id] ? [rcMap[d.id]] : [],
           sent_to_finance: sentToFinance,
           quittance_transferred: quittanceTransferred
         }
@@ -349,92 +364,94 @@ export default function FinanceDashboard() {
       return
     }
 
-    const confirmed = window.confirm(
-      `Confirmer le paiement du dossier "${dossier.souscripteur}" ?
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Confirmer le paiement',
+      message: `Confirmer le paiement du dossier "${dossier.souscripteur}" ?\n\nCette action clôturera définitivement le dossier.`,
+      type: 'warning',
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }))
+        setIsSaving(true)
 
-Cette action clôturera définitivement le dossier.`
-    )
-    if (!confirmed) return
+        try {
+          console.log(' [FinanceDashboard] Confirmation paiement pour dossier #', dossier.id)
 
-    setIsSaving(true)
+          const todayISO = new Date().toISOString().split('T')[0] // YYYY-MM-DD
 
-    try {
-      console.log(' [FinanceDashboard] Confirmation paiement pour dossier #', dossier.id)
+          // ── Étape 1 : date_paiement dans dossier_details_finance ──────
+          const { error: dateErr } = await supabase
+            .from('dossier_details_finance')
+            .upsert(
+              { dossier_id: dossier.id, date_paiement: todayISO },
+              { onConflict: 'dossier_id' }
+            )
 
-      const todayISO = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+          if (dateErr) throw dateErr
+          console.log(' [FinanceDashboard] date_paiement mise à jour :', todayISO)
 
-      // ── Étape 1 : date_paiement dans dossier_details_finance ──────
-      const { error: dateErr } = await supabase
-        .from('dossier_details_finance')
-        .upsert(
-          { dossier_id: dossier.id, date_paiement: todayISO },
-          { onConflict: 'dossier_id' }
-        )
+          // ── Étape 2 : etat = 'CLOTURE' dans dossiers ─────────────────
+          const { error: etatErr } = await supabase
+            .from('dossiers')
+            .update({ etat: 'CLOTURE' })
+            .eq('id', dossier.id)
 
-      if (dateErr) throw dateErr
-      console.log(' [FinanceDashboard] date_paiement mise à jour :', todayISO)
+          if (etatErr) throw etatErr
+          console.log(' [FinanceDashboard] Dossier clôturé')
 
-      // ── Étape 2 : etat = 'CLOTURE' dans dossiers ─────────────────
-      const { error: etatErr } = await supabase
-        .from('dossiers')
-        .update({ etat: 'CLOTURE' })
-        .eq('id', dossier.id)
-
-      if (etatErr) throw etatErr
-      console.log(' [FinanceDashboard] Dossier clôturé')
-
-      // ── Étape 3 : Historique ──────────────────────────────────────
-      if (user?.id) {
-        await logFinanceAction(
-          dossier.id,
-          'PAIEMENT_CONFIRME',
-          user.id,
-          {
-            description: `Paiement confirmé — dossier clôturé le ${todayISO}`,
-            old_status:  'EN_INSTANCE',
-            new_status:  'CLOTURE',
+          // ── Étape 3 : Historique ──────────────────────────────────────
+          if (user?.id) {
+            await logFinanceAction(
+              dossier.id,
+              'PAIEMENT_CONFIRME',
+              user.id,
+              {
+                description: `Paiement confirmé — dossier clôturé le ${todayISO}`,
+                old_status:  'EN_INSTANCE',
+                new_status:  'CLOTURE',
+              }
+            )
           }
-        )
-      }
 
-      // ── Étape 4 : Notifications pour les RC ──────────────────────
-      const { data: rcUsers, error: rcErr } = await supabase
-        .from('users')
-        .select('id, roles!inner(name)')
-        .eq('roles.name', 'RC')
+          // ── Étape 4 : Notifications pour les RC ──────────────────────
+          const { data: rcUsers, error: rcErr } = await supabase
+            .from('users')
+            .select('id, roles!inner(name)')
+            .eq('roles.name', 'RC')
 
-      if (rcErr) {
-        console.warn(' [FinanceDashboard] Erreur récupération RC (non bloquant) :', rcErr.message)
-      } else if (rcUsers && rcUsers.length > 0) {
-        const notifications = rcUsers.map((u) => ({
-          user_id:    u.id,
-          dossier_id: dossier.id,
-          type:       'PAIEMENT_CONFIRME',
-          message:    `Paiement confirmé pour le dossier de ${dossier.souscripteur} — dossier clôturé.`,
-          is_read:    false,
-          created_at: new Date().toISOString()
-        }))
+          if (rcErr) {
+            console.warn(' [FinanceDashboard] Erreur récupération RC (non bloquant) :', rcErr.message)
+          } else if (rcUsers && rcUsers.length > 0) {
+            const notifications = rcUsers.map((u) => ({
+              user_id:    u.id,
+              dossier_id: dossier.id,
+              type:       'PAIEMENT_CONFIRME',
+              message:    `Paiement confirmé pour le dossier de ${dossier.souscripteur} — dossier clôturé.`,
+              is_read:    false,
+              created_at: new Date().toISOString()
+            }))
 
-        const { error: notifErr } = await supabase
-          .from('notifications')
-          .insert(notifications)
+            const { error: notifErr } = await supabase
+              .from('notifications')
+              .insert(notifications)
 
-        if (notifErr) {
-          console.warn(' [FinanceDashboard] Erreur notifications (non bloquant) :', notifErr.message)
-        } else {
-          console.log(' [FinanceDashboard] Notifications RC créées :', notifications.length)
+            if (notifErr) {
+              console.warn(' [FinanceDashboard] Erreur notifications (non bloquant) :', notifErr.message)
+            } else {
+              console.log(' [FinanceDashboard] Notifications RC créées :', notifications.length)
+            }
+          }
+
+          // ── Étape 5 : Rafraîchissement ────────────────────────────────
+          await fetchFinanceDossiers()
+
+        } catch (err) {
+          console.error(' [FinanceDashboard] Erreur confirmation paiement :', err)
+          toast.error(`Erreur : ${err.message}`)
+        } finally {
+          setIsSaving(false)
         }
       }
-
-      // ── Étape 5 : Rafraîchissement ────────────────────────────────
-      await fetchFinanceDossiers()
-
-    } catch (err) {
-      console.error(' [FinanceDashboard] Erreur confirmation paiement :', err)
-      toast.error(`Erreur : ${err.message}`)
-    } finally {
-      setIsSaving(false)
-    }
+    })
   }
 
   // ─────────────────────────────────────────────────────────────────
@@ -636,12 +653,12 @@ Cette action clôturera définitivement le dossier.`
   }
 
   const handleExport = () => {
-    if (!dossiers.length) {
-      toast.error('Aucun dossier a exporter.')
+    if (!displayedDossiers.length) {
+      toast.error('Aucun dossier à exporter pour cet onglet.')
       return
     }
 
-    const rows = buildExportRows(dossiers)
+    const rows = buildExportRows(displayedDossiers)
     if (exportFormat === 'pdf') {
       exportToPdf(rows)
     } else {
@@ -740,6 +757,11 @@ Cette action clôturera définitivement le dossier.`
   const modalPrestationDetails = conformiteDossier?.dossier_details_prestation?.[0] || {}
   const modalFinanceDetails = conformiteDossier?.dossier_details_finance?.[0] || {}
 
+  const displayedDossiers = dossiers.filter(d => {
+    if (activeTab === 'actifs') return d.etat !== 'CLOTURE'
+    return d.etat === 'CLOTURE'
+  })
+
   // ─────────────────────────────────────────────────────────────────
   // Rendu principal
   // ─────────────────────────────────────────────────────────────────
@@ -752,7 +774,7 @@ Cette action clôturera définitivement le dossier.`
           <div>
             <h1 className="text-3xl font-bold text-comar-navy">Dashboard Finance</h1>
             <p className="text-gray-600 mt-1">
-              Liste de tous les dossiers au niveau Finance ({dossiers.length} au total)
+              {displayedDossiers.length} affiché{displayedDossiers.length > 1 ? 's' : ''} sur {dossiers.length}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -839,11 +861,41 @@ Cette action clôturera définitivement le dossier.`
 
         )}
 
+        {/* ── Onglets dossiers ── */}
+        <div className="mb-4 flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab('actifs')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+              activeTab === 'actifs'
+                ? 'bg-comar-navy text-white shadow-md'
+                : 'bg-white text-gray-600 border border-comar-neutral-border hover:bg-gray-50'
+            }`}
+          >
+            Dossiers actifs ({dossiers.filter(d => d.etat !== 'CLOTURE').length})
+          </button>
+          <button
+            onClick={() => setActiveTab('clotures')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+              activeTab === 'clotures'
+                ? 'bg-comar-navy text-white shadow-md'
+                : 'bg-white text-gray-600 border border-comar-neutral-border hover:bg-gray-50'
+            }`}
+          >
+            Dossiers clôturés ({dossiers.filter(d => d.etat === 'CLOTURE').length})
+          </button>
+        </div>
+
         {/* ── Message si aucun dossier ── */}
-        {dossiers.length === 0 ? (
+        {displayedDossiers.length === 0 ? (
           <div className="bg-white rounded-xl border border-comar-neutral-border p-12 text-center">
-            <h3 className="text-xl font-semibold text-comar-navy mb-2">Aucun dossier Finance</h3>
-            <p className="text-gray-600">Aucun dossier n'est actuellement au niveau FINANCE.</p>
+            <h3 className="text-xl font-semibold text-comar-navy mb-2">
+              {activeTab === 'actifs' ? 'Aucun dossier actif' : 'Aucun dossier clôturé'}
+            </h3>
+            <p className="text-gray-600">
+              {activeTab === 'actifs' 
+                ? 'Il n\'y a actuellement aucun dossier en attente de traitement.' 
+                : 'L\'historique des dossiers clôturés est vide.'}
+            </p>
           </div>
         ) : (
           /* ── Tableau des dossiers ── */
@@ -865,7 +917,7 @@ Cette action clôturera définitivement le dossier.`
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-comar-neutral-border">
-                  {dossiers.map((dossier) => {
+                  {displayedDossiers.map((dossier) => {
                     const detailsPrestation = dossier.dossier_details_prestation?.[0] || {}
                     const detailsFinance    = dossier.dossier_details_finance?.[0]    || {}
                     const agence            = dossier.agences                         || {}
@@ -956,7 +1008,7 @@ Cette action clôturera définitivement le dossier.`
             </div>
 
             <div className="xl:hidden divide-y divide-comar-neutral-border">
-              {dossiers.map((dossier) => {
+              {displayedDossiers.map((dossier) => {
                 const detailsPrestation = dossier.dossier_details_prestation?.[0] || {}
                 const detailsFinance    = dossier.dossier_details_finance?.[0]    || {}
                 const agence            = dossier.agences                         || {}
@@ -1281,6 +1333,15 @@ Cette action clôturera définitivement le dossier.`
           </div>
         </div>
       )}
+
+      <ConfirmModal 
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        type={confirmConfig.type}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+      />
 
     </FinanceLayout>
   )

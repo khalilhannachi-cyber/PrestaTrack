@@ -3,6 +3,7 @@ import { toast } from 'react-hot-toast'
 import AdminLayout from '../../components/AdminLayout'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabaseClient'
+import ConfirmModal from '../../components/ConfirmModal'
 
 const DEFAULT_SLA_THRESHOLDS = {
   RELATION_CLIENT: 3,
@@ -173,18 +174,18 @@ function getEtatLabel(etat) {
   return labels[etat] || etat || 'N/A'
 }
 
-function resolveOperationalService(dossier) {
+function resolveOperationalService(dossier, quittanceDate) {
   if (!dossier) return 'RELATION_CLIENT'
+  if (dossier.niveau === 'RC') return 'RELATION_CLIENT'
 
-  if (dossier.etat === 'EN_INSTANCE' || dossier.niveau === 'FINANCE') {
+  // Le service opérationnel est FINANCE si la quittance est transférée,
+  // peu importe le niveau technique (PRESTATION ou FINANCE).
+  // Tant que la quittance n'est pas là, le dossier est considéré en PRESTATION.
+  if (quittanceDate) {
     return 'FINANCE'
   }
 
-  if (dossier.niveau === 'PRESTATION') {
-    return 'PRESTATION'
-  }
-
-  return 'RELATION_CLIENT'
+  return 'PRESTATION'
 }
 
 function getServiceLabel(service) {
@@ -358,6 +359,7 @@ export default function ServicesMonitoring() {
 
   const [slaThresholds, setSlaThresholds] = useState(() => readStoredSlaThresholds())
   const [slaDraftThresholds, setSlaDraftThresholds] = useState(() => readStoredSlaThresholds())
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', type: 'warning', onConfirm: null })
   const [isEditingSla, setIsEditingSla] = useState(false)
 
   useEffect(() => {
@@ -550,15 +552,54 @@ export default function ServicesMonitoring() {
     return map
   }, [financeDetails])
 
+  const datesHistoryMap = useMemo(() => {
+    const map = {}
+    // On trie par date pour s'assurer de prendre le premier événement si doublon
+    const sortedActions = [...actionHistory].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    
+    for (const action of sortedActions) {
+      if (!map[action.dossier_id]) {
+        map[action.dossier_id] = {
+          prestationStartedAt: null,
+          quittanceTransferredAt: null
+        }
+      }
+      
+      if (action.action === 'ENVOI_PRESTATION' && !map[action.dossier_id].prestationStartedAt) {
+        map[action.dossier_id].prestationStartedAt = action.created_at
+      }
+      
+      if (action.action === 'QUITTANCE_TRANSFEREE' && !map[action.dossier_id].quittanceTransferredAt) {
+        map[action.dossier_id].quittanceTransferredAt = action.created_at
+      }
+    }
+    return map
+  }, [actionHistory])
+
   const allRows = useMemo(() => {
     const rows = dossiers.map((dossier) => {
       const prestation = prestationByDossier[dossier.id] || {}
       const finance = financeByDossier[dossier.id] || {}
-      const service = resolveOperationalService(dossier)
+      const dates = datesHistoryMap[dossier.id] || {}
+
+      const service = resolveOperationalService(dossier, dates.quittanceTransferredAt)
       const threshold = Number(slaThresholds[service] || DEFAULT_SLA_THRESHOLDS[service] || 3)
-      const lastDate = finance.date_paiement || dossier.updated_at || dossier.created_at
-      const staleDays = daysSinceDate(lastDate)
+      
+      // Détermination de la date de début du service actuel pour le calcul du SLA
+      let serviceStartDate = dossier.created_at
+      if (service === 'FINANCE') {
+        // Finance commence au transfert de quittance
+        serviceStartDate = dates.quittanceTransferredAt || dossier.updated_at
+      } else if (service === 'PRESTATION') {
+        // Prestation commence à l'envoi vers Prestation
+        serviceStartDate = dates.prestationStartedAt || dossier.created_at
+      }
+
       const isActive = dossier.etat !== 'CLOTURE' && dossier.etat !== 'ANNULE'
+      
+      // Si dossier clôturé, on fige le compteur à la date de paiement ou dernière maj
+      const lastDate = isActive ? serviceStartDate : (finance.date_paiement || dossier.updated_at)
+      const staleDays = daysSinceDate(lastDate)
 
       return {
         ...dossier,
@@ -944,121 +985,125 @@ export default function ServicesMonitoring() {
   }
 
   const handleCancelDossier = async (row) => {
-    const confirmed = window.confirm(`Confirmer l'annulation du dossier ${row.police_number || row.id} ?`)
-    if (!confirmed) return
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Annuler le dossier',
+      message: `Confirmer l'annulation du dossier ${row.police_number || row.id} ?\n\nCette action va clôturer ce dossier de force.`,
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }))
 
-    const reason = window.prompt("Motif d'annulation (optionnel):", '')
-    if (reason === null) return
+        setRowBusy(row.id, 'ANNULATION')
 
-    setRowBusy(row.id, 'ANNULATION')
-
-    try {
-      const nowIso = new Date().toISOString()
-      const reasonText = reason.trim()
-      const reference = row.police_number || row.id
-      const { clientMessage, serviceMessage } = buildCancellationMessages(reference, reasonText)
-
-      let persistedStatus = CANCELLED_STATUS
-      let usedFallbackStatus = false
-
-      let { error: updateError } = await supabase
-        .from('dossiers')
-        .update({
-          etat: persistedStatus,
-          is_urgent: false,
-          updated_at: nowIso,
-        })
-        .eq('id', row.id)
-
-      if (updateError && isEtatCheckConstraintError(updateError)) {
-        persistedStatus = CANCELLED_STATUS_FALLBACK
-        usedFallbackStatus = true
-
-        const retryResult = await supabase
-          .from('dossiers')
-          .update({
-            etat: persistedStatus,
-            is_urgent: false,
-            updated_at: nowIso,
-          })
-          .eq('id', row.id)
-
-        updateError = retryResult.error
-      }
-
-      if (updateError) throw updateError
-
-      setDossiers((prev) => {
-        return prev.map((item) => {
-          if (item.id !== row.id) return item
-          return {
-            ...item,
-            etat: persistedStatus,
-            is_urgent: false,
-            updated_at: nowIso,
-          }
-        })
-      })
-
-      let notifiedUsersCount = 0
-      const serviceRoles = getServiceRoles(row.service)
-
-      if (serviceRoles.length > 0) {
         try {
-          const { data: recipients, error: recipientsError } = await supabase
-            .from('users')
-            .select('id, roles!inner(name)')
-            .in('roles.name', serviceRoles)
+          const nowIso = new Date().toISOString()
+          const reasonText = "Annulé par l'administrateur"
+          const reference = row.police_number || row.id
+          const { clientMessage, serviceMessage } = buildCancellationMessages(reference, reasonText)
 
-          if (recipientsError) throw recipientsError
+          let persistedStatus = CANCELLED_STATUS
+          let usedFallbackStatus = false
 
-          const recipientIds = Array.from(new Set((recipients || []).map((item) => item.id).filter(Boolean)))
+          let { error: updateError } = await supabase
+            .from('dossiers')
+            .update({
+              etat: persistedStatus,
+              is_urgent: false,
+              updated_at: nowIso,
+            })
+            .eq('id', row.id)
 
-          if (recipientIds.length > 0) {
-            const notifications = recipientIds.map((recipientId) => ({
-              user_id: recipientId,
-              dossier_id: row.id,
-              type: 'ANNULATION_DOSSIER',
-              message: serviceMessage,
-              is_read: false,
-              created_at: nowIso,
-            }))
+          if (updateError && isEtatCheckConstraintError(updateError)) {
+            persistedStatus = CANCELLED_STATUS_FALLBACK
+            usedFallbackStatus = true
 
-            const { error: notifyError } = await supabase
-              .from('notifications')
-              .insert(notifications)
+            const retryResult = await supabase
+              .from('dossiers')
+              .update({
+                etat: persistedStatus,
+                is_urgent: false,
+                updated_at: nowIso,
+              })
+              .eq('id', row.id)
 
-            if (notifyError) throw notifyError
-
-            notifiedUsersCount = recipientIds.length
+            updateError = retryResult.error
           }
-        } catch (notifyError) {
-          console.warn('[ServicesMonitoring] Notification service non envoyée:', notifyError)
+
+          if (updateError) throw updateError
+
+          setDossiers((prev) => {
+            return prev.map((item) => {
+              if (item.id !== row.id) return item
+              return {
+                ...item,
+                etat: persistedStatus,
+                is_urgent: false,
+                updated_at: nowIso,
+              }
+            })
+          })
+
+          let notifiedUsersCount = 0
+          const serviceRoles = getServiceRoles(row.service)
+
+          if (serviceRoles.length > 0) {
+            try {
+              const { data: recipients, error: recipientsError } = await supabase
+                .from('users')
+                .select('id, roles!inner(name)')
+                .in('roles.name', serviceRoles)
+
+              if (recipientsError) throw recipientsError
+
+              const recipientIds = Array.from(new Set((recipients || []).map((item) => item.id).filter(Boolean)))
+
+              if (recipientIds.length > 0) {
+                const notifications = recipientIds.map((recipientId) => ({
+                  user_id: recipientId,
+                  dossier_id: row.id,
+                  type: 'ANNULATION_DOSSIER',
+                  message: serviceMessage,
+                  is_read: false,
+                  created_at: nowIso,
+                }))
+
+                const { error: notifyError } = await supabase
+                  .from('notifications')
+                  .insert(notifications)
+
+                if (notifyError) throw notifyError
+
+                notifiedUsersCount = recipientIds.length
+              }
+            } catch (notifyError) {
+              console.warn('[ServicesMonitoring] Notification service non envoyée:', notifyError)
+            }
+          }
+
+          await logAdminAction(
+            row,
+            'ANNULATION_DOSSIER',
+            clientMessage,
+            { oldStatus: row.etat, newStatus: persistedStatus }
+          )
+
+          setOpenedDossierId((previousId) => (previousId === row.id ? null : previousId))
+
+          if (notifiedUsersCount > 0) {
+            toast.success(`Dossier annulé. Notification envoyée à ${notifiedUsersCount} utilisateur(s).`)
+          } else if (usedFallbackStatus) {
+            toast.success('Dossier annulé. Statut technique appliqué: Clôturé (contrainte base).')
+          } else {
+            toast.success('Dossier annulé avec succès.')
+          }
+        } catch (err) {
+          console.error('[ServicesMonitoring] Erreur annulation dossier:', err)
+          toast.error(`Erreur annulation: ${err.message}`)
+        } finally {
+          clearRowBusy(row.id)
         }
       }
-
-      await logAdminAction(
-        row,
-        'ANNULATION_DOSSIER',
-        clientMessage,
-        { oldStatus: row.etat, newStatus: persistedStatus }
-      )
-
-      setOpenedDossierId((previousId) => (previousId === row.id ? null : previousId))
-
-      if (notifiedUsersCount > 0) {
-        toast.success(`Dossier annulé. Notification envoyée à ${notifiedUsersCount} utilisateur(s).`)
-      } else if (usedFallbackStatus) {
-        toast.success('Dossier annulé. Statut technique appliqué: Clôturé (contrainte base).')
-      } else {
-        toast.success('Dossier annulé avec succès.')
-      }
-    } catch (err) {
-      console.error('[ServicesMonitoring] Erreur annulation dossier:', err)
-      toast.error(`Erreur annulation: ${err.message}`)
-    } finally {
-      clearRowBusy(row.id)
-    }
+    })
   }
 
   const handleOpenDossier = (row) => {
@@ -1556,11 +1601,10 @@ export default function ServicesMonitoring() {
                 <button
                   key={filter.key}
                   onClick={() => setServiceFilter(filter.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                    serviceFilter === filter.key
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${serviceFilter === filter.key
                       ? 'bg-comar-navy text-white'
                       : 'bg-comar-neutral-bg text-gray-600 hover:bg-gray-200'
-                  }`}
+                    }`}
                 >
                   {filter.label}
                 </button>
@@ -1696,6 +1740,14 @@ export default function ServicesMonitoring() {
           </div>
         )}
       </div>
+      <ConfirmModal
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        type={confirmConfig.type}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+      />
     </AdminLayout>
   )
 }

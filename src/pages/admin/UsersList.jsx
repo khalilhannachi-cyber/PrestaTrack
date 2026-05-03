@@ -51,7 +51,7 @@ export default function UsersList() {
   const handleToggleActive = async (userId, currentStatus) => {
     const newStatus = !currentStatus
     const action = newStatus ? 'activer' : 'désactiver'
-    
+
     if (!confirm(`Voulez-vous vraiment ${action} cet utilisateur ?`)) return
 
     try {
@@ -134,158 +134,156 @@ export default function UsersList() {
 
   return (
     <AdminLayout>
-      <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Gestion des Utilisateurs</h1>
-        <Link
-          to="/admin/users/nouveau"
-          className="bg-comar-navy text-white px-4 py-2 rounded hover:bg-comar-navy-light transition"
-        >
-          + Nouvel Utilisateur
-        </Link>
-      </div>
-
-      {users.length === 0 ? (
-        <div className="bg-white rounded-xl border border-comar-neutral-border p-8 text-center text-gray-500">
-          Aucun utilisateur trouvé.
+      <div className="p-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-2xl font-extrabold text-comar-navy">Gestion des Utilisateurs</h1>
+            <p className="text-sm text-gray-500">Administrez les comptes et les accès aux modules</p>
+          </div>
+          <Link
+            to="/admin/users/nouveau"
+            className="bg-comar-navy text-white px-6 py-3 rounded-xl hover:bg-comar-navy-light transition shadow-lg shadow-comar-navy/20 flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-widest"
+          >
+            <span className="text-lg">+</span> Nouvel Utilisateur
+          </Link>
         </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-comar-neutral-border overflow-hidden">
-          <table className="min-w-full divide-y divide-comar-neutral-border">
-            <thead className="bg-comar-navy">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
-                  Email
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
-                  Nom complet
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
-                  Rôle
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
-                  Statut
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
-                  Date de création
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-comar-neutral-border">
-              {users.map((user) => (
-                <tr key={user.id} className={`hover:bg-comar-navy-50/30 transition-colors duration-150 ${!user.is_active ? 'opacity-60' : ''}`}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {user.email}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {user.full_name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      user.roles?.name === 'ADMIN' ? 'bg-red-100 text-red-800' :
-                      user.roles?.name === 'RELATION_CLIENT' ? 'bg-comar-navy-50 text-comar-navy' :
-                      user.roles?.name === 'FINANCE' ? 'bg-green-100 text-green-800' :
-                      'bg-comar-neutral-bg text-gray-800'
-                    }`}>
-                      {user.roles?.name || 'N/A'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      user.is_active ? 'bg-green-100 text-green-800' : 'bg-comar-neutral-bg text-gray-800'
-                    }`}>
-                      {user.is_active ? 'Actif' : 'Inactif'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(user.created_at).toLocaleDateString('fr-FR')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleToggleActive(user.id, user.is_active)}
-                        className={`${
-                          user.is_active ? 'text-orange-600 hover:text-orange-900' : 'text-green-600 hover:text-green-900'
-                        } font-medium text-xs`}
-                        title={user.is_active ? 'Désactiver' : 'Activer'}
-                      >
-                        {user.is_active ? 'Désactiver' : 'Activer'}
-                      </button>
-                      <button
-                        onClick={() => handleOpenEditRole(user)}
-                        className="text-comar-navy hover:text-comar-navy-light font-medium text-xs"
-                        title="Modifier le rôle"
-                      >
-                        Modifier rôle
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUser(user.id)}
-                        className="text-red-600 hover:text-red-900 font-medium text-xs"
-                        title="Supprimer"
-                      >
-                        Supprimer
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
 
-      {/* Modal pour modifier le rôle */}
-      {editingUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-            <h2 className="text-xl font-bold mb-4">Modifier le rôle</h2>
-            
-            <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-2">
-                <strong>Utilisateur:</strong> {editingUser.full_name} ({editingUser.email})
-              </p>
-              <p className="text-sm text-gray-600 mb-4">
-                <strong>Rôle actuel:</strong> {editingUser.roles?.name}
-              </p>
-              
-              <label htmlFor="new_role" className="block text-sm font-medium text-comar-navy mb-2">
-                Nouveau rôle <span className="text-comar-red">*</span>
-              </label>
-              <select
-                id="new_role"
-                value={newRoleId}
-                onChange={(e) => setNewRoleId(e.target.value)}
-                className="w-full px-3 py-2 border border-comar-neutral-border rounded-md focus:outline-none focus:ring-2 focus:ring-comar-navy/20"
-              >
-                <option value="">Sélectionnez un rôle</option>
-                {roles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {role.name}
-                  </option>
-                ))}
-              </select>
+        {users.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-comar-neutral-border p-12 text-center">
+            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
             </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={handleUpdateRole}
-                className="flex-1 bg-comar-navy text-white px-4 py-2 rounded hover:bg-comar-navy-light transition"
-              >
-                Modifier
-              </button>
-              <button
-                onClick={() => setEditingUser(null)}
-                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 transition"
-              >
-                Annuler
-              </button>
+            <p className="text-gray-500 font-medium">Aucun utilisateur trouvé.</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-comar-neutral-border overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-comar-neutral-border">
+                <thead className="bg-comar-navy">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-[11px] font-bold text-white/70 uppercase tracking-widest">Utilisateur</th>
+                    <th className="px-6 py-4 text-left text-[11px] font-bold text-white/70 uppercase tracking-widest">Nom complet</th>
+                    <th className="px-6 py-4 text-left text-[11px] font-bold text-white/70 uppercase tracking-widest">Rôle</th>
+                    <th className="px-6 py-4 text-left text-[11px] font-bold text-white/70 uppercase tracking-widest">Statut</th>
+                    <th className="px-6 py-4 text-left text-[11px] font-bold text-white/70 uppercase tracking-widest">Création</th>
+                    <th className="px-6 py-4 text-left text-[11px] font-bold text-white/70 uppercase tracking-widest">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-comar-neutral-border">
+                  {users.map((user) => (
+                    <tr key={user.id} className={`hover:bg-comar-navy-50/30 transition-colors duration-150 ${!user.is_active ? 'bg-gray-50/50' : ''}`}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-comar-navy">{user.email}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-600 font-medium">{user.full_name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2.5 py-1 inline-flex text-[10px] font-bold rounded-full uppercase tracking-wider ${
+                          user.roles?.name === 'ADMIN' ? 'bg-red-100 text-red-700 border border-red-200' :
+                          user.roles?.name === 'RELATION_CLIENT' ? 'bg-comar-navy-50 text-comar-navy border border-comar-navy/10' :
+                          user.roles?.name === 'FINANCE' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
+                          'bg-gray-100 text-gray-600 border border-gray-200'
+                        }`}>
+                          {user.roles?.name || 'N/A'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2.5 py-1 inline-flex text-[10px] font-bold rounded-full uppercase tracking-wider ${
+                          user.is_active ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-400 border border-gray-200'
+                        }`}>
+                          {user.is_active ? 'Actif' : 'Inactif'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
+                        {new Date(user.created_at).toLocaleDateString('fr-FR')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleToggleActive(user.id, user.is_active)}
+                            className={`px-3 py-1.5 text-[10px] font-bold rounded-lg uppercase tracking-wider transition ${
+                              user.is_active 
+                                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' 
+                                : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                            }`}
+                          >
+                            {user.is_active ? 'Désactiver' : 'Activer'}
+                          </button>
+                          <button
+                            onClick={() => handleOpenEditRole(user)}
+                            className="px-3 py-1.5 text-[10px] font-bold rounded-lg bg-comar-navy text-white hover:bg-comar-navy-light uppercase tracking-wider transition shadow-sm"
+                          >
+                            Rôle
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="px-3 py-1.5 text-[10px] font-bold rounded-lg bg-red-100 text-red-600 hover:bg-red-200 uppercase tracking-wider transition"
+                          >
+                            Supprimer
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+
+        {/* Modal pour modifier le rôle */}
+        {editingUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold mb-4">Modifier le rôle</h2>
+
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 mb-2">
+                  <strong>Utilisateur:</strong> {editingUser.full_name} ({editingUser.email})
+                </p>
+                <p className="text-sm text-gray-600 mb-4">
+                  <strong>Rôle actuel:</strong> {editingUser.roles?.name}
+                </p>
+
+                <label htmlFor="new_role" className="block text-sm font-medium text-comar-navy mb-2">
+                  Nouveau rôle <span className="text-comar-red">*</span>
+                </label>
+                <select
+                  id="new_role"
+                  value={newRoleId}
+                  onChange={(e) => setNewRoleId(e.target.value)}
+                  className="w-full px-3 py-2 border border-comar-neutral-border rounded-md focus:outline-none focus:ring-2 focus:ring-comar-navy/20"
+                >
+                  <option value="">Sélectionnez un rôle</option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleUpdateRole}
+                  className="flex-1 bg-comar-navy text-white px-4 py-2 rounded hover:bg-comar-navy-light transition"
+                >
+                  Modifier
+                </button>
+                <button
+                  onClick={() => setEditingUser(null)}
+                  className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 transition"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AdminLayout>
   )

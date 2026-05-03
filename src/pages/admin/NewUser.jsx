@@ -47,7 +47,7 @@ export default function NewUser() {
 
       if (error) throw error
       setRoles(data || [])
-      
+
       // Sélectionner le premier rôle par défaut
       if (data && data.length > 0) {
         setFormData(prev => ({ ...prev, role_id: data[0].id }))
@@ -59,7 +59,7 @@ export default function NewUser() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     // ═══════════════════════════════════════════════════════════════
     // VALIDATION : Email @comar.tn uniquement
     // ═══════════════════════════════════════════════════════════════
@@ -67,7 +67,7 @@ export default function NewUser() {
       toast.error(' L\'email doit se terminer par @comar.tn\n\nExemple : utilisateur@comar.tn')
       return
     }
-    
+
     setLoading(true)
 
     try {
@@ -77,7 +77,7 @@ export default function NewUser() {
       // APPEL DE LA EDGE FUNCTION create-user
       // Utilise supabase.functions.invoke() pour une authentification correcte
       // ─────────────────────────────────────────────────────────
-      
+
       console.log(' Appel de la fonction create-user...')
 
       // Invoquer la fonction avec le SDK Supabase (gère automatiquement l'auth)
@@ -109,14 +109,14 @@ export default function NewUser() {
       }
 
       console.log(' Utilisateur créé avec succès:', data.user.id)
-      
+
       // ─────────────────────────────────────────────────────────
       // PRÉPARATION DE LA FICHE UTILISATEUR
       // ─────────────────────────────────────────────────────────
-      
+
       // Récupérer le nom du rôle pour l'affichage
       const selectedRole = roles.find(r => r.id === formData.role_id)
-      
+
       // Créer l'objet utilisateur complet pour la fiche
       const userInfo = {
         id: data.user.id,
@@ -127,18 +127,18 @@ export default function NewUser() {
         role_description: selectedRole?.description || '',
         created_at: new Date().toISOString()
       }
-      
+
       // ─────────────────────────────────────────────────────────
       // AFFICHAGE DE LA FICHE (au lieu de la redirection)
       // ─────────────────────────────────────────────────────────
       setCreatedUser(userInfo)
       setShowFiche(true)
-      
+
     } catch (error) {
       console.error(' Erreur lors de la création:', error)
-      
+
       let errorMessage = 'Erreur lors de la création de l\'utilisateur'
-      
+
       if (error?.message) {
         if (error.message.includes('already')) {
           errorMessage = 'Cet email est déjà utilisé'
@@ -152,7 +152,7 @@ export default function NewUser() {
       } else if (typeof error === 'string') {
         errorMessage = error
       }
-      
+
       console.error(' Message final affiché:', errorMessage)
       toast(' ' + errorMessage)
     } finally {
@@ -162,12 +162,12 @@ export default function NewUser() {
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    
+
     setFormData({
       ...formData,
       [name]: value
     })
-    
+
     // Validation en temps réel de l'email
     if (name === 'email') {
       if (value.trim() === '') {
@@ -247,7 +247,7 @@ export default function NewUser() {
               </h1>
               <p className="text-gray-600">Compte créé avec succès</p>
               <div className="mt-4 inline-block bg-green-100 text-green-800 px-4 py-2 rounded-full font-semibold">
-                 Activation réussie
+                Activation réussie
               </div>
             </div>
 
@@ -292,7 +292,7 @@ export default function NewUser() {
                   {createdUser.password}
                 </p>
                 <p className="text-xs text-red-600 mt-2">
-                  ️ <strong>Important :</strong> Conservez ce mot de passe en lieu sûr. 
+                  ️ <strong>Important :</strong> Conservez ce mot de passe en lieu sûr.
                   Il ne sera plus accessible après fermeture de cette page.
                 </p>
               </div>
@@ -404,140 +404,139 @@ export default function NewUser() {
   return (
     <AdminLayout>
       <div className="p-6 max-w-2xl mx-auto">
-      <div className="mb-6">
-        <button
-          onClick={() => navigate('/admin/users')}
-          className="text-comar-navy hover:text-comar-navy-light mb-4"
-        >
-          ← Retour à la liste
-        </button>
-        <h1 className="text-2xl font-bold">Nouvel Utilisateur</h1>
-      </div>
-
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <p className="text-sm text-blue-800">
-          ℹ️ <strong>Important:</strong> Assurez-vous que la confirmation email est désactivée dans Supabase 
-          (Authentication → Providers → Email → Décocher "Confirm email")
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-comar-neutral-border p-6 space-y-6">
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-comar-navy mb-2">
-            Email <span className="text-comar-red">*</span>
-          </label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-            className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 ${
-              emailValid === null ? 'border-comar-neutral-border' :
-              emailValid ? 'border-green-500 bg-green-50' :
-              'border-red-500 bg-red-50'
-            }`}
-            placeholder="utilisateur@comar.tn"
-          />
-          
-          {/* Message de validation en temps réel */}
-          {emailValid === false && (
-            <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-               L'email doit se terminer par <span className="font-mono bg-red-100 px-1 rounded">@comar.tn</span>
-            </p>
-          )}
-          
-          {emailValid === true && (
-            <p className="mt-1 text-sm text-green-600 flex items-center gap-1">
-               Format d'email valide
-            </p>
-          )}
-          
-          {emailValid === null && formData.email === '' && (
-            <p className="mt-1 text-sm text-gray-600">
-              ️ <strong>Obligatoire :</strong> L'email doit se terminer par <span className="font-mono bg-gray-100 px-1 rounded">@comar.tn</span>
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-comar-navy mb-2">
-            Mot de passe <span className="text-comar-red">*</span>
-          </label>
-          <input
-            type="password"
-            id="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-            minLength={6}
-            className="w-full px-3 py-2 border border-comar-neutral-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy"
-            placeholder="Min. 6 caractères"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="full_name" className="block text-sm font-medium text-comar-navy mb-2">
-            Nom complet <span className="text-comar-red">*</span>
-          </label>
-          <input
-            type="text"
-            id="full_name"
-            name="full_name"
-            value={formData.full_name}
-            onChange={handleChange}
-            required
-            className="w-full px-3 py-2 border border-comar-neutral-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy"
-            placeholder="Jean Dupont"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="role_id" className="block text-sm font-medium text-comar-navy mb-2">
-            Rôle <span className="text-comar-red">*</span>
-          </label>
-          <select
-            id="role_id"
-            name="role_id"
-            value={formData.role_id}
-            onChange={handleChange}
-            required
-            className="w-full px-3 py-2 border border-comar-neutral-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy"
-          >
-            {roles.length === 0 ? (
-              <option value="">Chargement des rôles...</option>
-            ) : (
-              <>
-                <option value="">Sélectionnez un rôle</option>
-                {roles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {role.name}
-                  </option>
-                ))}
-              </>
-            )}
-          </select>
-        </div>
-
-        <div className="flex gap-4 pt-4">
+        <div className="mb-6">
           <button
-            type="submit"
-            disabled={loading}
-            className="bg-comar-navy text-white px-6 py-2 rounded-md hover:bg-comar-navy-light disabled:opacity-50 disabled:cursor-not-allowed transition"
-          >
-            {loading ? 'Création...' : 'Créer l\'Utilisateur'}
-          </button>
-          <button
-            type="button"
             onClick={() => navigate('/admin/users')}
-            className="bg-gray-200 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-300 transition"
+            className="text-comar-navy hover:text-comar-navy-light mb-4"
           >
-            Annuler
+            ← Retour à la liste
           </button>
+          <h1 className="text-2xl font-bold">Nouvel Utilisateur</h1>
         </div>
-      </form>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <p className="text-sm text-blue-800">
+            ℹ️ <strong>Important:</strong> Assurez-vous que la confirmation email est désactivée dans Supabase
+            (Authentication → Providers → Email → Décocher "Confirm email")
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-comar-neutral-border p-6 space-y-6">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-comar-navy mb-2">
+              Email <span className="text-comar-red">*</span>
+            </label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              required
+              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 ${emailValid === null ? 'border-comar-neutral-border' :
+                  emailValid ? 'border-green-500 bg-green-50' :
+                    'border-red-500 bg-red-50'
+                }`}
+              placeholder="utilisateur@comar.tn"
+            />
+
+            {/* Message de validation en temps réel */}
+            {emailValid === false && (
+              <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                L'email doit se terminer par <span className="font-mono bg-red-100 px-1 rounded">@comar.tn</span>
+              </p>
+            )}
+
+            {emailValid === true && (
+              <p className="mt-1 text-sm text-green-600 flex items-center gap-1">
+                Format d'email valide
+              </p>
+            )}
+
+            {emailValid === null && formData.email === '' && (
+              <p className="mt-1 text-sm text-gray-600">
+                ️ <strong>Obligatoire :</strong> L'email doit se terminer par <span className="font-mono bg-gray-100 px-1 rounded">@comar.tn</span>
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-comar-navy mb-2">
+              Mot de passe <span className="text-comar-red">*</span>
+            </label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+              minLength={6}
+              className="w-full px-3 py-2 border border-comar-neutral-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy"
+              placeholder="Min. 6 caractères"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="full_name" className="block text-sm font-medium text-comar-navy mb-2">
+              Nom complet <span className="text-comar-red">*</span>
+            </label>
+            <input
+              type="text"
+              id="full_name"
+              name="full_name"
+              value={formData.full_name}
+              onChange={handleChange}
+              required
+              className="w-full px-3 py-2 border border-comar-neutral-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy"
+              placeholder="Jean Dupont"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="role_id" className="block text-sm font-medium text-comar-navy mb-2">
+              Rôle <span className="text-comar-red">*</span>
+            </label>
+            <select
+              id="role_id"
+              name="role_id"
+              value={formData.role_id}
+              onChange={handleChange}
+              required
+              className="w-full px-3 py-2 border border-comar-neutral-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy"
+            >
+              {roles.length === 0 ? (
+                <option value="">Chargement des rôles...</option>
+              ) : (
+                <>
+                  <option value="">Sélectionnez un rôle</option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
+                    </option>
+                  ))}
+                </>
+              )}
+            </select>
+          </div>
+
+          <div className="flex gap-4 pt-4">
+            <button
+              type="submit"
+              disabled={loading}
+              className="bg-comar-navy text-white px-6 py-2 rounded-md hover:bg-comar-navy-light disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              {loading ? 'Création...' : 'Créer l\'Utilisateur'}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/admin/users')}
+              className="bg-gray-200 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-300 transition"
+            >
+              Annuler
+            </button>
+          </div>
+        </form>
       </div>
     </AdminLayout>
   )

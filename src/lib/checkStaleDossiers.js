@@ -27,19 +27,27 @@ const NIVEAU_TO_ROLE = {
  */
 export async function checkStaleDossiers(userRole) {
   try {
-    if (!userRole || !NIVEAU_TO_ROLE[userRole]) return
+    if (!userRole) return
+    const isAdmin = userRole === 'ADMIN'
 
-    // ── 1. Dossiers bloqués : updated_at > 3 jours, même niveau, non clôturés ──
+    // ── 1. Dossiers bloqués : updated_at > 3 jours, non clôturés ──
     const cutoff = new Date()
     cutoff.setDate(cutoff.getDate() - STALE_DAYS)
     const cutoffISO = cutoff.toISOString()
 
-    const { data: staleDossiers, error: staleErr } = await supabase
+    let query = supabase
       .from('dossiers')
       .select('id, souscripteur, police_number, niveau, updated_at, created_at')
-      .eq('niveau', userRole)
       .neq('etat', 'CLOTURE')
+      .neq('etat', 'ANNULE')
       .lt('updated_at', cutoffISO)
+
+    // Si pas admin, on ne regarde que son propre service
+    if (!isAdmin) {
+      query = query.eq('niveau', userRole)
+    }
+
+    const { data: staleDossiers, error: staleErr } = await query
 
     if (staleErr) {
       console.error('[checkStaleDossiers] query error:', staleErr.message)
@@ -67,14 +75,16 @@ export async function checkStaleDossiers(userRole) {
 
     if (dossiersToNotify.length === 0) return
 
-    // ── 3. Récupérer les utilisateurs du service concerné ──────────────────────
-    const roleName = NIVEAU_TO_ROLE[userRole]
-    const { data: serviceUsers, error: usersErr } = await supabase
+    // ── 3. Récupérer les utilisateurs à notifier (Admins + Service concerné) ──
+    // On notifie toujours les Admins, et si c'est un service spécifique, on notifie aussi ses membres.
+    const roleToNotify = NIVEAU_TO_ROLE[userRole] || userRole
+    
+    const { data: allUsersToNotify, error: usersErr } = await supabase
       .from('users')
       .select('id, roles!inner ( name )')
-      .eq('roles.name', roleName)
+      .or(`roles.name.eq.ADMIN${!isAdmin ? `,roles.name.eq.${roleToNotify}` : ''}`)
 
-    if (usersErr || !serviceUsers || serviceUsers.length === 0) return
+    if (usersErr || !allUsersToNotify || allUsersToNotify.length === 0) return
 
     // ── 4. Créer les notifications ────────────────────────────────────────────
     const niveauLabel = {
@@ -92,15 +102,26 @@ export async function checkStaleDossiers(userRole) {
         (1000 * 60 * 60 * 24)
       )
 
-      for (const u of serviceUsers) {
-        rows.push({
-          user_id: u.id,
-          dossier_id: dossier.id,
-          type: 'DOSSIER_BLOQUE',
-          message: `⚠️ Le dossier de "${dossier.souscripteur}" (${dossier.police_number || 'N/A'}) est bloqué au niveau ${niveauLabel[dossier.niveau] || dossier.niveau} depuis ${daysSince} jour${daysSince > 1 ? 's' : ''}.`,
-          is_read: false,
-          created_at: now
-        })
+      // On crée une notification pour chaque utilisateur cible
+      for (const u of allUsersToNotify) {
+        // Optionnel : On peut filtrer pour ne pas notifier un membre d'un autre service 
+        // si le dossier ne le concerne pas, mais ici on notifie Admin + Membres du service du dossier.
+        // Comme on a filtré la liste usersToNotify plus haut, on peut insérer pour tous.
+        
+        // Si on veut être très précis : l'admin reçoit tout, les autres ne reçoivent que leur niveau.
+        const userIsAdmin = u.roles.name === 'ADMIN'
+        const userMatchesDossierNiveau = u.roles.name === dossier.niveau
+
+        if (userIsAdmin || userMatchesDossierNiveau) {
+          rows.push({
+            user_id: u.id,
+            dossier_id: dossier.id,
+            type: 'DOSSIER_BLOQUE',
+            message: `⚠️ DOSSIER BLOQUÉ : "${dossier.souscripteur}" est en attente au niveau ${niveauLabel[dossier.niveau] || dossier.niveau} depuis ${daysSince} jours.`,
+            is_read: false,
+            created_at: now
+          })
+        }
       }
     }
 
@@ -109,7 +130,7 @@ export async function checkStaleDossiers(userRole) {
       if (insertErr) {
         console.error('[checkStaleDossiers] insert error:', insertErr.message)
       } else {
-        console.log(`[checkStaleDossiers] ${rows.length} notification(s) créée(s) pour ${dossiersToNotify.length} dossier(s) bloqué(s).`)
+        console.log(`[checkStaleDossiers] ${rows.length} notification(s) de blocage créée(s).`)
       }
     }
   } catch (err) {

@@ -311,11 +311,11 @@ export default function NewDossier() {
                   const selectedFile = e.target.files[0];
                   if (selectedFile) {
                     if (selectedFile.size > 5 * 1024 * 1024) {
-                      alert("Le fichier dépasse 5Mo !");
+                      toast.error("Le fichier dépasse 5Mo !");
                       e.target.value = null;
                       setFile(null);
                     } else if (!['application/pdf', 'image/png', 'image/jpeg'].includes(selectedFile.type)) {
-                      alert("Format de fichier non autorisé. Seuls PDF, PNG et JPG sont acceptés.");
+                      toast.error("Format de fichier non autorisé. Seuls PDF, PNG et JPG sont acceptés.");
                       e.target.value = null;
                       setFile(null);
                     } else {
