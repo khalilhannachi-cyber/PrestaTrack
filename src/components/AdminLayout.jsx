@@ -44,6 +44,12 @@ export default function AdminLayout({ children }) {
     { to: '/admin/agences', label: 'Agences', icon: (<svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5M3.75 3v18m4.5-18v18m4.5-18v18m4.5-18v18M5.25 7.5h1.5m-1.5 3h1.5m-1.5 3h1.5m4.5-6h1.5m-1.5 3h1.5m-1.5 3h1.5m4.5-6h1.5m-1.5 3h1.5m-1.5 3h1.5" /></svg>) },
   ]
 
+  const shadowLinks = [
+    { to: '/rc/dossiers', label: 'Vue Relation Client', icon: '📞' },
+    { to: '/prestation/dashboard', label: 'Vue Prestation', icon: '📄' },
+    { to: '/finance/dashboard', label: 'Vue Finance', icon: '💰' },
+  ]
+
   return (
     <div className="min-h-screen bg-comar-neutral-bg">
       {/* Navbar */}
@@ -75,6 +81,30 @@ export default function AdminLayout({ children }) {
                   {link.label}
                 </Link>
               ))}
+
+              <div className="h-5 w-px bg-white/15 mx-1"></div>
+              
+              {/* Dropdown Shadowing */}
+              <div className="relative group">
+                <button className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-medium text-white/80 hover:bg-white/8 transition-all duration-200 cursor-pointer">
+                  <span>Ouvrir les Dashboards</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+                </button>
+                <div className="absolute top-full right-0 mt-1 w-48 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <div className="p-1">
+                    {shadowLinks.map((link) => (
+                      <Link
+                        key={link.to}
+                        to={link.to}
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-comar-navy/5 hover:text-comar-navy rounded-lg transition-colors font-medium"
+                      >
+                        <span>{link.icon}</span>
+                        {link.label}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
               <div className="h-5 w-px bg-white/15 mx-1"></div>
 

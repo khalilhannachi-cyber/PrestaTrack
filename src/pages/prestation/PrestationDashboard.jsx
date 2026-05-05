@@ -11,6 +11,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import PrestationLayout from '../../components/PrestationLayout'
 import ConfirmModal from '../../components/ConfirmModal'
 import { toast } from 'react-hot-toast'
+// Composant Timeline
+import DossierTimeline from '../../components/DossierTimeline'
 /**
  * Dashboard des prestations
  * Affiche tous les dossiers au niveau PRESTATION
@@ -19,13 +21,13 @@ import { toast } from 'react-hot-toast'
  * @returns {React.ReactNode} La page dashboard dans le PrestationLayout
  */
 export default function PrestationDashboard() {
-  const { user } = useAuth() // Récupération de l'utilisateur connecté
+  const { user, role } = useAuth() // Récupération de l'utilisateur connecté
   const navigate = useNavigate() // Navigation programmatique
   const [dossiers, setDossiers] = useState([]) // Liste des dossiers
   const [loading, setLoading] = useState(true) // Indicateur de chargement
   const [error, setError] = useState(null) // Erreur éventuelle
   const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', type: 'warning', onConfirm: null })
-  
+
   // États pour la modal d'édition
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingDossier, setEditingDossier] = useState(null)
@@ -42,6 +44,9 @@ export default function PrestationDashboard() {
   const [filterDate, setFilterDate] = useState('')
   const [filterPolice, setFilterPolice] = useState('')
   const [filterAgence, setFilterAgence] = useState('')
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
+  const [selectedDossierHistory, setSelectedDossierHistory] = useState([])
+  const [selectedDossierName, setSelectedDossierName] = useState('')
 
   // Chargement des dossiers au montage du composant
   useEffect(() => {
@@ -65,13 +70,13 @@ export default function PrestationDashboard() {
   const logAction = async (dossierId, action, oldStatus, newStatus, description = '') => {
     try {
       console.log(` [PrestationDashboard] Enregistrement action: ${action} pour dossier #${dossierId}`)
-      
+
       // Vérifier que l'utilisateur est authentifié
       if (!user || !user.id) {
         console.warn(' [PrestationDashboard] Utilisateur non authentifié - historique non enregistré')
         return false
       }
-      
+
       const { error } = await supabase
         .from('historique_actions')
         .insert([
@@ -159,20 +164,24 @@ export default function PrestationDashboard() {
         rcDetails.forEach(r => { rcMap[r.dossier_id] = r })
       }
 
-      // Requête 3 : Historique pour statuts "envoyé"
+      // Requête 3 : Historique pour statuts "envoyé" et "préparé"
       let sentToFinanceSet = new Set()
       let quittanceTransferredSet = new Set()
+      let quittancePreteSet = new Set()
       if (dossierIds.length > 0) {
         const { data: actionHistory } = await supabase
           .from('historique_actions')
-          .select('dossier_id, action')
+          .select('dossier_id, action, created_at')
           .in('dossier_id', dossierIds)
-          .in('action', ['ENVOI_FINANCE', 'QUITTANCE_TRANSFEREE'])
+          .in('action', ['ENVOI_FINANCE', 'QUITTANCE_TRANSFEREE', 'QUITTANCE_PRETE', 'QUITTANCE_PRETE_ANNULEE'])
+          .order('created_at', { ascending: true })
 
         if (actionHistory) {
           actionHistory.forEach(item => {
             if (item.action === 'ENVOI_FINANCE') sentToFinanceSet.add(item.dossier_id)
             if (item.action === 'QUITTANCE_TRANSFEREE') quittanceTransferredSet.add(item.dossier_id)
+            if (item.action === 'QUITTANCE_PRETE') quittancePreteSet.add(item.dossier_id)
+            if (item.action === 'QUITTANCE_PRETE_ANNULEE') quittancePreteSet.delete(item.dossier_id)
           })
         }
       }
@@ -180,12 +189,14 @@ export default function PrestationDashboard() {
       const merged = dossiers.map(d => {
         const wasSent = sentToFinanceSet.has(d.id)
         const quittanceDone = quittanceTransferredSet.has(d.id)
+        const quittancePrete = quittancePreteSet.has(d.id)
         return {
           ...d,
           dossier_details_prestation: prestationMap[d.id] ? [prestationMap[d.id]] : [],
           dossier_details_rc: rcMap[d.id] ? [rcMap[d.id]] : [],
           has_been_sent_to_finance: wasSent,
           has_quittance_transferred: quittanceDone,
+          has_quittance_prete: quittancePrete,
           // Un dossier est "envoyé sans quittance" s'il a été envoyé à Finance MAIS que la quittance n'est pas encore transférée
           is_envoye_sans_quittance: wasSent && !quittanceDone,
           // Un dossier est "en cours" s'il n'a pas encore été envoyé à Finance
@@ -263,6 +274,18 @@ export default function PrestationDashboard() {
     }))
   }
 
+  const openHistory = async (dossier) => {
+    setSelectedDossierName(dossier.souscripteur)
+    setIsHistoryModalOpen(true)
+    const { data, error } = await supabase
+      .from('historique_actions')
+      .select('*')
+      .eq('dossier_id', dossier.id)
+      .order('created_at', { ascending: false })
+
+    if (!error) setSelectedDossierHistory(data || [])
+  }
+
   /**
    * Soumet les modifications du dossier
    * Processus en 2 étapes :
@@ -271,7 +294,7 @@ export default function PrestationDashboard() {
    */
   const handleSubmitEdit = async (e) => {
     e.preventDefault()
-    
+
     if (!editingDossier) return
 
     // Vérification d'authentification
@@ -293,9 +316,9 @@ export default function PrestationDashboard() {
 
     try {
       console.log(' [PrestationDashboard] Début de la modification du dossier #', editingDossier.id)
-      
+
       const oldEtat = editingDossier.etat
-      
+
       // ─────────────────────────────────────────────────────────────
       // ÉTAPE 1 : Mise à jour de dossier_details_prestation
       // Vérifier si la ligne existe, sinon la créer
@@ -334,7 +357,7 @@ export default function PrestationDashboard() {
       // ÉTAPE 1b : Mise à jour de motif_instance dans dossier_details_rc
       // ─────────────────────────────────────────────────────────────
       console.log(' [PrestationDashboard] Étape 1b : Mise à jour motif_instance dans dossier_details_rc')
-      
+
       const { error: rcError } = await supabase
         .from('dossier_details_rc')
         .update({
@@ -354,7 +377,7 @@ export default function PrestationDashboard() {
       // L'état reste EN_COURS - Les boutons s'activent en fonction de document_complet
       // ─────────────────────────────────────────────────────────────
       console.log(' [PrestationDashboard] Étape 2 : Mise à jour de updated_at')
-      
+
       const { error: dossierError } = await supabase
         .from('dossiers')
         .update({
@@ -460,14 +483,14 @@ export default function PrestationDashboard() {
 
         try {
           console.log(' [PrestationDashboard] Début du basculement des pièces pour dossier #', dossier.id)
-          
+
           const oldEtat = dossier.etat
 
           // ─────────────────────────────────────────────────────────────
           // ÉTAPE 1 : Mise à jour de l'état du dossier
           // ─────────────────────────────────────────────────────────────
           console.log(` [PrestationDashboard] Étape 1 : Mise à jour de l'état à ${newEtat}`)
-          
+
           const { error: dossierError } = await supabase
             .from('dossiers')
             .update({
@@ -487,7 +510,7 @@ export default function PrestationDashboard() {
           // ÉTAPE 2 : Ajout dans l'historique des actions
           // ─────────────────────────────────────────────────────────────
           const actionType = isEnInstance ? 'ANNULATION_TRAITEMENT' : 'PIECE_TRANSFEREE'
-          const actionDescription = isEnInstance 
+          const actionDescription = isEnInstance
             ? `Annulation du traitement des pièces - État: ${oldEtat} → ${newEtat}`
             : `Pièces transférées pour traitement - État: ${oldEtat} → ${newEtat}`
 
@@ -556,84 +579,46 @@ export default function PrestationDashboard() {
         setConfirmConfig(prev => ({ ...prev, isOpen: false }))
         setIsSaving(true)
 
-        try {
-          console.log(' [PrestationDashboard] Envoi dossier au service Finance #', dossier.id)
+          const isQuittancePrete = dossier.has_quittance_prete
 
-          const { error: updateError } = await supabase
-            .from('dossiers')
-            .update({ 
-              updated_at: new Date().toISOString() 
-            })
-            .eq('id', dossier.id)
+          try {
+            // Mise à jour de la date du dossier
+            await supabase.from('dossiers').update({ updated_at: new Date().toISOString() }).eq('id', dossier.id)
 
-          if (updateError) {
-            console.error(' [PrestationDashboard] Erreur mise à jour dossier:', updateError)
-            throw new Error(`Erreur lors de l\'envoi: ${updateError.message}`)
-          }
-
-          const { data: usersToNotify, error: usersError } = await supabase
-            .from('users')
-            .select(`
-              id,
-              email,
-              full_name,
-              roles!inner (
-                name
-              )
-            `)
-            .eq('roles.name', 'FINANCE')
-
-          if (usersError) {
-            console.error(' [PrestationDashboard] Erreur récupération Finance:', usersError)
-          } else if (usersToNotify && usersToNotify.length > 0) {
-            const notifications = usersToNotify.map(userToNotify => ({
-              user_id: userToNotify.id,
-              dossier_id: dossier.id,
-              type: 'DOSSIER_ENVOYE_FINANCE',
-              message: `Dossier envoyé au service Finance : ${dossier.souscripteur}`,
-              is_read: false,
-              created_at: new Date().toISOString()
-            }))
-
-            const { error: notifError } = await supabase
-              .from('notifications')
-              .insert(notifications)
-
-            if (notifError) {
-              console.error(' [PrestationDashboard] Erreur insertion notifications:', notifError)
+            // Notifications groupées
+            const { data: usersToNotify } = await supabase.from('users').select('id, roles!inner(name)').eq('roles.name', 'FINANCE')
+            if (usersToNotify?.length > 0) {
+              const notifications = usersToNotify.map(u => ({
+                user_id: u.id,
+                dossier_id: dossier.id,
+                type: isQuittancePrete ? 'DOSSIER_ET_QUITTANCE_ENVOYE' : 'DOSSIER_ENVOYE_FINANCE',
+                message: isQuittancePrete 
+                  ? `Dossier et Quittance envoyés par Prestation : ${dossier.souscripteur}`
+                  : `Dossier envoyé au service Finance : ${dossier.souscripteur}`,
+                is_read: false,
+                created_at: new Date().toISOString()
+              }))
+              await supabase.from('notifications').insert(notifications)
             }
-          }
 
-          await logAction(
-            dossier.id,
-            'ENVOI_FINANCE',
-            dossier.etat,
-            dossier.etat,
-            'Dossier envoyé au service Finance'
-          )
-
-          // Mise à jour locale
-          setDossiers(prev => prev.map(d => {
-            if (d.id === dossier.id) {
-              const newHasSent = true
-              const newHasQuittance = d.has_quittance_transferred
-              return { 
-                ...d, 
-                has_been_sent_to_finance: newHasSent,
-                is_envoye_sans_quittance: newHasSent && !newHasQuittance,
-                is_en_cours_presta: !newHasSent
-              }
+            // Historique des actions
+            await logAction(dossier.id, 'ENVOI_FINANCE', dossier.etat, dossier.etat, 'Dossier envoyé au service Finance')
+            
+            if (isQuittancePrete) {
+              // Si la quittance était prête, on valide son transfert
+              await logAction(dossier.id, 'QUITTANCE_TRANSFEREE', dossier.etat, dossier.etat, 'Quittance transférée (envoi groupé avec le dossier)')
+              // Nettoyage de l'état "prêt"
+              await supabase.from('historique_actions').delete().eq('dossier_id', dossier.id).eq('action', 'QUITTANCE_PRETE')
             }
-            return d
-          }).filter(d => !(d.has_been_sent_to_finance && d.has_quittance_transferred)))
 
-          toast.success(' Dossier envoyé au service Finance.')
-        } catch (err) {
-          console.error(' [PrestationDashboard] Erreur lors de l\'envoi Finance:', err)
-          toast.error(` Erreur: ${err.message}`)
-        } finally {
-          setIsSaving(false)
-        }
+            toast.success(isQuittancePrete ? 'Dossier et Quittance envoyés à Finance !' : 'Dossier envoyé à Finance.')
+            await fetchPrestationDossiers(true)
+          } catch (err) {
+            console.error(' [PrestationDashboard] Erreur lors de l\'envoi Finance:', err)
+            toast.error(`Erreur: ${err.message}`)
+          } finally {
+            setIsSaving(false)
+          }
       }
     })
   }
@@ -653,118 +638,88 @@ export default function PrestationDashboard() {
       return
     }
 
-    // Vérification d'authentification
-    if (!user || !user.id) {
+    if (!user?.id) {
       toast.error(' Votre session a expiré. Veuillez vous reconnecter.')
       navigate('/login')
       return
     }
 
-    // Vérification que le document est complet ET quittance_signee est true
     const detailsPrestation = dossier.dossier_details_prestation?.[0] || {}
     if (!detailsPrestation.document_complet || !detailsPrestation.quittance_signee) {
-      toast.error(' Le document doit être complet et la quittance signée pour transférer au service Finance.')
+      toast.error(' Le document doit être complet et la quittance signée.')
       return
     }
 
+    const isEnCours = activeTab === 'en_cours'
+    
+    // CAS 1 : Onglet "Dossiers en cours" -> Toggle de PREPARATION
+    if (isEnCours) {
+      const isPrete = dossier.has_quittance_prete
+      setConfirmConfig({
+        isOpen: true,
+        title: isPrete ? 'Annuler la préparation' : 'Préparer le transfert',
+        message: isPrete
+          ? `Annuler la préparation du transfert pour "${dossier.souscripteur}" ?`
+          : `Marquer la quittance comme "prête" ? Elle sera envoyée automatiquement avec le dossier lors du clic sur "Envoyer".`,
+        type: isPrete ? 'danger' : 'warning',
+        onConfirm: async () => {
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }))
+          setIsSaving(true)
+          try {
+            if (isPrete) {
+              // Au lieu de supprimer (qui peut échouer à cause de RLS), on enregistre une annulation
+              const success = await logAction(dossier.id, 'QUITTANCE_PRETE_ANNULEE', dossier.etat, dossier.etat, 'Annulation de la préparation du transfert')
+              if (!success) throw new Error("Erreur lors de l'enregistrement de l'annulation")
+              
+              setDossiers(prev => prev.map(d => 
+                d.id === dossier.id ? { ...d, has_quittance_prete: false } : d
+              ))
+              toast.success('Préparation annulée.')
+            } else {
+              const success = await logAction(dossier.id, 'QUITTANCE_PRETE', dossier.etat, dossier.etat, 'Quittance préparée pour envoi groupé')
+              if (!success) throw new Error("Erreur lors de l'enregistrement de l'action")
+              
+              setDossiers(prev => prev.map(d => 
+                d.id === dossier.id ? { ...d, has_quittance_prete: true } : d
+              ))
+              toast.success('Quittance prête pour l\'envoi !')
+            }
+            await fetchPrestationDossiers(true)
+          } catch (err) {
+            console.error(' [PrestationDashboard] Erreur toggle préparation:', err)
+            toast.error(`Erreur: ${err.message}`)
+          } finally {
+            setIsSaving(false)
+          }
+        }
+      })
+      return
+    }
+
+    // CAS 2 : Onglet "Envoyés sans quittance" -> Transfert IMMEDIAT
     setConfirmConfig({
       isOpen: true,
-      title: 'Confirmer le transfert',
-      message: `Confirmer le transfert physique de la quittance signée pour le dossier "${dossier.souscripteur}" ?`,
+      title: 'Transférer la quittance',
+      message: `Confirmer le transfert de la quittance pour "${dossier.souscripteur}" au service Finance ?`,
       type: 'warning',
       onConfirm: async () => {
         setConfirmConfig(prev => ({ ...prev, isOpen: false }))
         setIsSaving(true)
-
         try {
-          console.log(' [PrestationDashboard] Début du transfert de quittance pour dossier #', dossier.id)
-          
-          const currentEtat = dossier.etat
-
-          // ─────────────────────────────────────────────────────────────
-          // NOTE : Le niveau reste PRESTATION — la validation Finance
-          // (depuis l'interface Finance) est ce qui fera passer le
-          // dossier au niveau FINANCE (étapes 8-9 du workflow)
-          // ─────────────────────────────────────────────────────────────
-
-          // ─────────────────────────────────────────────────────────────
-          // ÉTAPE 1 : Récupération des utilisateurs FINANCE
-          // ─────────────────────────────────────────────────────────────
-          console.log(' [PrestationDashboard] Étape 1 : Récupération des utilisateurs FINANCE à notifier')
-          
-          const { data: usersToNotify, error: usersError } = await supabase
-            .from('users')
-            .select(`
-              id,
-              email,
-              full_name,
-              roles!inner (
-                name
-              )
-            `)
-            .eq('roles.name', 'FINANCE')
-
-          if (usersError) {
-            console.error(' [PrestationDashboard] Erreur récupération utilisateurs:', usersError)
-            // On continue même si ça échoue
-          } else {
-            console.log(' [PrestationDashboard] Utilisateurs FINANCE à notifier:', usersToNotify?.length || 0)
-            
-            // Création des notifications pour chaque utilisateur FINANCE
-            if (usersToNotify && usersToNotify.length > 0) {
-              const notifications = usersToNotify.map(userToNotify => ({
-                user_id: userToNotify.id,
-                dossier_id: dossier.id,
-                type: 'QUITTANCE_TRANSFEREE',
-                message: `Quittance transférée pour le dossier de ${dossier.souscripteur}`,
-                is_read: false,
-                created_at: new Date().toISOString()
-              }))
-
-              const { error: notifError } = await supabase
-                .from('notifications')
-                .insert(notifications)
-
-              if (notifError) {
-                console.error(' [PrestationDashboard] Erreur insertion notifications:', notifError)
-                // On continue même si ça échoue
-              } else {
-                console.log(' [PrestationDashboard] Notifications créées pour Finance')
-              }
-            }
+          const { data: usersToNotify } = await supabase.from('users').select('id, roles!inner(name)').eq('roles.name', 'FINANCE')
+          if (usersToNotify?.length > 0) {
+            const notifications = usersToNotify.map(u => ({
+              user_id: u.id, dossier_id: dossier.id, type: 'QUITTANCE_TRANSFEREE',
+              message: `Quittance transférée pour le dossier de ${dossier.souscripteur}`,
+              is_read: false, created_at: new Date().toISOString()
+            }))
+            await supabase.from('notifications').insert(notifications)
           }
-
-          // ─────────────────────────────────────────────────────────────
-          // ÉTAPE 2 : Ajout dans l'historique des actions
-          // ─────────────────────────────────────────────────────────────
-          await logAction(
-            dossier.id,
-            'QUITTANCE_TRANSFEREE',
-            currentEtat,
-            currentEtat,
-            `Quittance signée transférée physiquement au service Finance - en attente de validation`
-          )
-
-          // Mise à jour locale
-          setDossiers(prev => prev.map(d => {
-            if (d.id === dossier.id) {
-              const newHasSent = d.has_been_sent_to_finance
-              const newHasQuittance = true
-              return { 
-                ...d, 
-                has_quittance_transferred: newHasQuittance,
-                is_envoye_sans_quittance: newHasSent && !newHasQuittance,
-                is_en_cours_presta: !newHasSent
-              }
-            }
-            return d
-          }).filter(d => !(d.has_been_sent_to_finance && d.has_quittance_transferred)))
-
-          toast.success(' Quittance transférée au service Finance ! L\'équipe a été notifiée. Le dossier reste en instance jusqu\'à validation par Finance.')
-
+          await logAction(dossier.id, 'QUITTANCE_TRANSFEREE', dossier.etat, dossier.etat, 'Quittance transférée au service Finance')
+          toast.success('Quittance transférée !')
+          await fetchPrestationDossiers(true)
         } catch (err) {
-          console.error(' [PrestationDashboard] Erreur lors du transfert de quittance:', err)
-          toast.error(` Erreur: ${err.message}`)
+          toast.error(`Erreur: ${err.message}`)
         } finally {
           setIsSaving(false)
         }
@@ -860,7 +815,7 @@ export default function PrestationDashboard() {
     if (value === null || value === undefined) {
       return <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-comar-neutral-bg text-gray-600">N/A</span>
     }
-    
+
     return value ? (
       <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-emerald-50 text-emerald-700">
         ✓ Oui
@@ -1131,149 +1086,146 @@ export default function PrestationDashboard() {
         {/* Statistiques rapides */}
         {dossiers.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-              {/* Total */}
-              <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Total</p>
-                    <p className="text-2xl font-bold text-comar-navy mt-1">{dossiers.length}</p>
-                  </div>
-                  <div className="w-10 h-10 rounded-xl bg-comar-navy-50 flex items-center justify-center"><svg className="w-5 h-5 text-comar-navy" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg></div>
+            {/* Total */}
+            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Total</p>
+                  <p className="text-2xl font-bold text-comar-navy mt-1">{dossiers.length}</p>
                 </div>
-              </div>
-
-              {/* En cours */}
-              <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">En cours</p>
-                    <p className="text-2xl font-bold text-sky-600 mt-1">
-                      {dossiers.filter(d => d.etat === 'EN_COURS').length}
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center"><svg className="w-5 h-5 text-sky-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" /></svg></div>
-                </div>
-              </div>
-
-              {/* Documents complets */}
-              <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Docs complets</p>
-                    <p className="text-2xl font-bold text-emerald-600 mt-1">
-                      {dossiers.filter(d => d.dossier_details_prestation?.[0]?.document_complet === true).length}
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center"><svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-9M10.125 2.25h.375a9 9 0 019 9v.375M10.125 2.25A3.375 3.375 0 0113.5 5.625v1.5c0 .621.504 1.125 1.125 1.125h1.5a3.375 3.375 0 013.375 3.375M9 15l2.25 2.25L15 12" /></svg></div>
-                </div>
-              </div>
-
-              {/* En instance */}
-              <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">En instance</p>
-                    <p className="text-2xl font-bold text-amber-600 mt-1">
-                      {dossiers.filter(d => d.etat === 'EN_INSTANCE').length}
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center"><svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
-                </div>
-              </div>
-
-              {/* Quittances signées */}
-              <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Quittances</p>
-                    <p className="text-2xl font-bold text-violet-600 mt-1">
-                      {dossiers.filter(d => d.dossier_details_prestation?.[0]?.quittance_signee === true).length}
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center"><svg className="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0118 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3l1.5 1.5 3-3.75" /></svg></div>
-                </div>
+                <div className="w-10 h-10 rounded-xl bg-comar-navy-50 flex items-center justify-center"><svg className="w-5 h-5 text-comar-navy" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg></div>
               </div>
             </div>
 
+            {/* En cours */}
+            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">En cours</p>
+                  <p className="text-2xl font-bold text-sky-600 mt-1">
+                    {dossiers.filter(d => d.etat === 'EN_COURS').length}
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center"><svg className="w-5 h-5 text-sky-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" /></svg></div>
+              </div>
+            </div>
+
+            {/* Documents complets */}
+            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Docs complets</p>
+                  <p className="text-2xl font-bold text-emerald-600 mt-1">
+                    {dossiers.filter(d => d.dossier_details_prestation?.[0]?.document_complet === true).length}
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center"><svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-9M10.125 2.25h.375a9 9 0 019 9v.375M10.125 2.25A3.375 3.375 0 0113.5 5.625v1.5c0 .621.504 1.125 1.125 1.125h1.5a3.375 3.375 0 013.375 3.375M9 15l2.25 2.25L15 12" /></svg></div>
+              </div>
+            </div>
+
+            {/* En instance */}
+            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">En instance</p>
+                  <p className="text-2xl font-bold text-amber-600 mt-1">
+                    {dossiers.filter(d => d.etat === 'EN_INSTANCE').length}
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center"><svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
+              </div>
+            </div>
+
+            {/* Quittances signées */}
+            <div className="bg-white rounded-xl border border-comar-neutral-border p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Quittances</p>
+                  <p className="text-2xl font-bold text-violet-600 mt-1">
+                    {dossiers.filter(d => d.dossier_details_prestation?.[0]?.quittance_signee === true).length}
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center"><svg className="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0118 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3l1.5 1.5 3-3.75" /></svg></div>
+              </div>
+            </div>
+          </div>
         )}
 
-          {/* ══════ Filtres ══════ */}
-          <div className="bg-white rounded-xl border border-comar-neutral-border p-4 mb-6">
-            <h3 className="text-xs font-semibold text-comar-navy uppercase tracking-wider mb-3 flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" /></svg>
-              Filtres
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Souscripteur</label>
-                <input
-                  type="text"
-                  value={filterSouscripteur}
-                  onChange={(e) => setFilterSouscripteur(e.target.value)}
-                  placeholder="Rechercher..."
-                  className="w-full px-3 py-2 border border-comar-neutral-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Agence</label>
-                <input
-                  type="text"
-                  value={filterAgence}
-                  onChange={(e) => setFilterAgence(e.target.value)}
-                  placeholder="Rechercher..."
-                  className="w-full px-3 py-2 border border-comar-neutral-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Date de réception</label>
-                <input
-                  type="date"
-                  value={filterDate}
-                  onChange={(e) => setFilterDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-comar-neutral-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Numéro Police</label>
-                <input
-                  type="text"
-                  value={filterPolice}
-                  onChange={(e) => setFilterPolice(e.target.value)}
-                  placeholder="Rechercher..."
-                  className="w-full px-3 py-2 border border-comar-neutral-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all"
-                />
-              </div>
+        {/* ══════ Filtres ══════ */}
+        <div className="bg-white rounded-xl border border-comar-neutral-border p-4 mb-6">
+          <h3 className="text-xs font-semibold text-comar-navy uppercase tracking-wider mb-3 flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" /></svg>
+            Filtres
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Souscripteur</label>
+              <input
+                type="text"
+                value={filterSouscripteur}
+                onChange={(e) => setFilterSouscripteur(e.target.value)}
+                placeholder="Rechercher..."
+                className="w-full px-3 py-2 border border-comar-neutral-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all"
+              />
             </div>
-            {(filterSouscripteur || filterDate || filterPolice || filterAgence) && (
-              <button
-                onClick={() => { setFilterSouscripteur(''); setFilterDate(''); setFilterPolice(''); setFilterAgence('') }}
-                className="mt-3 text-xs text-comar-navy hover:text-comar-red font-medium transition-colors flex items-center gap-1 cursor-pointer"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                Réinitialiser les filtres
-              </button>
-            )}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Agence</label>
+              <input
+                type="text"
+                value={filterAgence}
+                onChange={(e) => setFilterAgence(e.target.value)}
+                placeholder="Rechercher..."
+                className="w-full px-3 py-2 border border-comar-neutral-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Date de réception</label>
+              <input
+                type="date"
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+                className="w-full px-3 py-2 border border-comar-neutral-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Numéro Police</label>
+              <input
+                type="text"
+                value={filterPolice}
+                onChange={(e) => setFilterPolice(e.target.value)}
+                placeholder="Rechercher..."
+                className="w-full px-3 py-2 border border-comar-neutral-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-comar-navy/20 focus:border-comar-navy transition-all"
+              />
+            </div>
           </div>
+          {(filterSouscripteur || filterDate || filterPolice || filterAgence) && (
+            <button
+              onClick={() => { setFilterSouscripteur(''); setFilterDate(''); setFilterPolice(''); setFilterAgence('') }}
+              className="mt-3 text-xs text-comar-navy hover:text-comar-red font-medium transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              Réinitialiser les filtres
+            </button>
+          )}
+        </div>
 
         {/* Onglets de statut */}
         <div className="flex space-x-1 bg-gray-100/50 p-1 rounded-xl mb-6 self-start">
           <button
             onClick={() => setActiveTab('en_cours')}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              activeTab === 'en_cours'
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'en_cours'
                 ? 'bg-white text-comar-navy shadow-sm'
                 : 'text-gray-500 hover:text-comar-navy hover:bg-gray-200/50'
-            }`}
+              }`}
           >
             Dossiers en cours ({dossiersEnCours.length})
           </button>
           <button
             onClick={() => setActiveTab('envoyes')}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              activeTab === 'envoyes'
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'envoyes'
                 ? 'bg-white text-comar-navy shadow-sm'
                 : 'text-gray-500 hover:text-comar-navy hover:bg-gray-200/50'
-            }`}
+              }`}
           >
             Envoyés sans quittance ({dossiersEnvoyesSansQuittance.length})
           </button>
@@ -1329,28 +1281,22 @@ export default function PrestationDashboard() {
                 </thead>
                 <tbody className="bg-white divide-y divide-comar-neutral-border">
                   {displayedDossiers.map((dossier) => {
-                    // Extraction des données jointes (peut être null/undefined)
                     const detailsRC = dossier.dossier_details_rc?.[0] || {}
                     const detailsPrestation = dossier.dossier_details_prestation?.[0] || {}
                     const agence = dossier.agences || {}
 
-                    // Logique de désactivation des boutons
                     const isNiveauPrestation = dossier.niveau === 'PRESTATION'
                     const isLocked = dossier.etat === 'ANNULE' || dossier.etat === 'CLOTURE'
                     const isDocumentComplet = detailsPrestation.document_complet === true
                     const isQuittanceSignee = detailsPrestation.quittance_signee === true
 
-                    // Désactiver tous les boutons si niveau != PRESTATION
-                    const canEdit = isNiveauPrestation && !isLocked && !isSaving
-                    // "Pièces à traiter" actif uniquement si doc complet et niveau PRESTATION
-                    const canMarkPieces = isNiveauPrestation && !isLocked && isDocumentComplet && !isSaving
-                    const canEnvoyerFinance = isNiveauPrestation && !isLocked && dossier.etat === 'EN_INSTANCE' && !isSaving
-                    // Désactiver "Transfert quittance" si le document n'est pas complet OU quittance_signee = false OU niveau != PRESTATION
-                    const canTransferQuittance = isNiveauPrestation && !isLocked && isDocumentComplet && isQuittanceSignee && !isSaving
+                    const canEdit = isNiveauPrestation && !isLocked && !isSaving && role !== 'ADMIN'
+                    const canMarkPieces = isNiveauPrestation && !isLocked && isDocumentComplet && !isSaving && role !== 'ADMIN'
+                    const canEnvoyerFinance = isNiveauPrestation && !isLocked && dossier.etat === 'EN_INSTANCE' && !isSaving && role !== 'ADMIN'
+                    const canTransferQuittance = isNiveauPrestation && !isLocked && isDocumentComplet && isQuittanceSignee && !isSaving && role !== 'ADMIN'
 
                     return (
                       <tr key={dossier.id} className="hover:bg-comar-navy-50/30 transition-colors duration-150">
-                        {/* Souscripteur */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <div className="text-sm font-semibold text-gray-900">
@@ -1363,56 +1309,50 @@ export default function PrestationDashboard() {
                             )}
                           </div>
                         </td>
-                        
-                        {/* Numéro de police */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono">
                           {dossier.police_number || '-'}
                         </td>
-                        
-                        {/* Agence */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                           {agence.nom || '-'}
                         </td>
-                        
-                        {/* Date de réception */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                           {formatDate(detailsRC.date_reception, dossier.created_at)}
                         </td>
-                        
-                        {/* Document complet */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           {renderBooleanBadge(detailsPrestation.document_complet)}
                         </td>
-                        
-                        {/* Quittance signée */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           {renderBooleanBadge(detailsPrestation.quittance_signee)}
                         </td>
-                        
-                        {/* État */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           {renderEtatBadge(dossier.etat)}
                         </td>
-                        
-                        {/* Actions */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <div className="flex gap-2">
+                            <button
+                              onClick={() => openHistory(dossier)}
+                              className="px-3 py-1 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded transition text-xs font-semibold flex items-center gap-1"
+                              title="Voir l'historique"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                              Historique
+                            </button>
+
                             {activeTab === 'en_cours' ? (
                               <>
                                 <button
                                   onClick={() => openEditModal(dossier)}
                                   disabled={!canEdit}
-                                  className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${
-                                    canEdit
+                                  className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${canEdit
                                       ? 'bg-comar-navy text-white hover:bg-comar-navy-light'
                                       : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                  }`}
+                                    }`}
                                   title={
                                     !isNiveauPrestation
                                       ? 'Le dossier n\'est plus au niveau PRESTATION'
                                       : isLocked
-                                      ? 'Dossier clôturé ou annulé'
-                                      : 'Traiter le dossier'
+                                        ? 'Dossier clôturé ou annulé'
+                                        : 'Traiter le dossier'
                                   }
                                 >
                                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" /></svg>
@@ -1421,23 +1361,22 @@ export default function PrestationDashboard() {
                                 <button
                                   onClick={() => handlePiecesATraiter(dossier)}
                                   disabled={!canMarkPieces}
-                                  className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${
-                                    canMarkPieces
+                                  className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${canMarkPieces
                                       ? dossier.etat === 'EN_INSTANCE'
                                         ? 'bg-amber-500 text-white hover:bg-amber-600'
                                         : 'bg-emerald-600 text-white hover:bg-emerald-700'
                                       : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                  }`}
+                                    }`}
                                   title={
                                     !isNiveauPrestation
                                       ? 'Le dossier n\'est plus au niveau PRESTATION'
                                       : isLocked
-                                      ? 'Dossier clôturé ou annulé'
-                                      : !isDocumentComplet
-                                      ? 'Le document doit être marqué comme complet'
-                                      : dossier.etat === 'EN_INSTANCE'
-                                      ? 'Annuler le traitement des pièces'
-                                      : 'Marquer les pièces comme à traiter'
+                                        ? 'Dossier clôturé ou annulé'
+                                        : !isDocumentComplet
+                                          ? 'Le document doit être marqué comme complet'
+                                          : dossier.etat === 'EN_INSTANCE'
+                                            ? 'Annuler le traitement des pièces'
+                                            : 'Marquer les pièces comme à traiter'
                                   }
                                 >
                                   {dossier.etat === 'EN_INSTANCE' ? (
@@ -1445,46 +1384,75 @@ export default function PrestationDashboard() {
                                   ) : (
                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                   )}
-                                  {dossier.etat === 'EN_INSTANCE' ? 'Annuler traitement' : 'Pièces à traiter'}
+                                  {dossier.etat === 'EN_INSTANCE' ? 'Annuler' : 'Pièces à traiter'}
                                 </button>
                                 <button
                                   onClick={() => handleEnvoyerFinance(dossier)}
                                   disabled={!canEnvoyerFinance}
-                                  className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${
-                                    canEnvoyerFinance
+                                  className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${canEnvoyerFinance
                                       ? 'bg-comar-navy text-white hover:bg-comar-navy-light'
                                       : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                  }`}
+                                    }`}
                                   title={
                                     !isNiveauPrestation
                                       ? 'Le dossier n\'est plus au niveau PRESTATION'
                                       : isLocked
-                                      ? 'Dossier clôturé ou annulé'
-                                      : dossier.etat !== 'EN_INSTANCE'
-                                      ? 'Cliquez d\'abord sur "Pièces à traiter"'
-                                      : 'Envoyer le dossier au service Finance'
+                                        ? 'Dossier clôturé ou annulé'
+                                        : dossier.etat !== 'EN_INSTANCE'
+                                          ? 'Cliquez d\'abord sur "Pièces à traiter"'
+                                          : 'Envoyer le dossier au service Finance'
                                   }
                                 >
                                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
                                   Envoyer
                                 </button>
+
+                                 {isQuittanceSignee && (
+                                  <button
+                                    onClick={() => handleTransfertQuittance(dossier)}
+                                    disabled={!canTransferQuittance && !dossier.has_quittance_prete}
+                                    className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-bold ${
+                                      dossier.has_quittance_prete
+                                        ? 'bg-sky-600 text-white hover:bg-sky-700 shadow-md'
+                                        : canTransferQuittance
+                                        ? 'bg-violet-600 text-white hover:bg-violet-700 shadow-md'
+                                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                    }`}
+                                    title={
+                                      dossier.has_quittance_prete
+                                        ? 'La quittance est prête et sera envoyée avec le dossier'
+                                        : 'Préparer le transfert de la quittance'
+                                    }
+                                  >
+                                    {dossier.has_quittance_prete ? (
+                                      <>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        Prête pour envoi
+                                      </>
+                                    ) : (
+                                      <>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 16.5L16.5 7.5M16.5 7.5H9.75M16.5 7.5v6.75" /></svg>
+                                        Transfert quittance
+                                      </>
+                                    )}
+                                  </button>
+                                )}
                               </>
                             ) : (
                               <>
                                 <button
                                   onClick={() => openEditModal(dossier)}
                                   disabled={!canEdit}
-                                  className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${
-                                    canEdit
+                                  className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-semibold ${canEdit
                                       ? 'bg-comar-navy text-white hover:bg-comar-navy-light'
                                       : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                  }`}
+                                    }`}
                                   title={
                                     !isNiveauPrestation
                                       ? 'Le dossier n\'est plus au niveau PRESTATION'
                                       : isLocked
-                                      ? 'Dossier clôturé ou annulé'
-                                      : 'Traiter le dossier'
+                                        ? 'Dossier clôturé ou annulé'
+                                        : 'Traiter le dossier'
                                   }
                                 >
                                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" /></svg>
@@ -1493,21 +1461,20 @@ export default function PrestationDashboard() {
                                 <button
                                   onClick={() => handleTransfertQuittance(dossier)}
                                   disabled={!canTransferQuittance}
-                                  className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-bold ${
-                                    canTransferQuittance
+                                  className={`inline-flex items-center gap-1 px-3 py-1 rounded transition text-xs font-bold ${canTransferQuittance
                                       ? 'bg-violet-600 text-white hover:bg-violet-700 shadow-md'
                                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                  }`}
+                                    }`}
                                   title={
                                     !isNiveauPrestation
                                       ? 'Le dossier n\'est plus au niveau PRESTATION'
                                       : isLocked
-                                      ? 'Dossier clôturé ou annulé'
-                                      : !isDocumentComplet
-                                      ? 'Le document doit être marqué comme complet'
-                                      : !isQuittanceSignee
-                                      ? 'La quittance doit être signée'
-                                      : 'Transférer la quittance au service Finance'
+                                        ? 'Dossier clôturé ou annulé'
+                                        : !isDocumentComplet
+                                          ? 'Le document doit être marqué comme complet'
+                                          : !isQuittanceSignee
+                                            ? 'La quittance doit être signée'
+                                            : 'Transférer la quittance au service Finance'
                                   }
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 16.5L16.5 7.5M16.5 7.5H9.75M16.5 7.5v6.75" /></svg>
@@ -1544,7 +1511,7 @@ export default function PrestationDashboard() {
         {isEditModalOpen && editingDossier && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
             {/* Overlay */}
-            <div 
+            <div
               className="fixed inset-0 bg-black/50 transition-opacity"
               onClick={closeEditModal}
             ></div>
@@ -1762,7 +1729,7 @@ export default function PrestationDashboard() {
                         </>
                       ) : (
                         <>
-                           Enregistrer
+                          Enregistrer
                         </>
                       )}
                     </button>
@@ -1772,9 +1739,28 @@ export default function PrestationDashboard() {
             </div>
           </div>
         )}
+
+        {/* Modal d'historique */}
+        {isHistoryModalOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={() => setIsHistoryModalOpen(false)}></div>
+            <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-comar-navy">
+                <div>
+                  <h2 className="text-xl font-bold text-white">Historique du dossier</h2>
+                  <p className="text-white/70 text-xs mt-1">{selectedDossierName}</p>
+                </div>
+                <button onClick={() => setIsHistoryModalOpen(false)} className="text-white/60 hover:text-white text-2xl">✕</button>
+              </div>
+              <div className="p-6 overflow-y-auto">
+                <DossierTimeline history={selectedDossierHistory} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      <ConfirmModal 
+      <ConfirmModal
         isOpen={confirmConfig.isOpen}
         title={confirmConfig.title}
         message={confirmConfig.message}

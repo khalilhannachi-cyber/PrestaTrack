@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext'
 // Layout spécifique aux pages Relation Client
 import RCLayout from '../../components/RCLayout'
 import ConfirmModal from '../../components/ConfirmModal'
+import DossierTimeline from '../../components/DossierTimeline'
 
 const POLICE_NUMBER_REGEX = /^\d{8}-\d$/
 
@@ -23,7 +24,7 @@ const POLICE_NUMBER_REGEX = /^\d{8}-\d$/
 export default function DossierDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, role } = useAuth()
   const [dossier, setDossier] = useState(null)
   const [loading, setLoading] = useState(true)
   const [transmitting, setTransmitting] = useState(false)
@@ -31,6 +32,7 @@ export default function DossierDetail() {
   const [editing, setEditing] = useState(false)
   const [agences, setAgences] = useState([])
   const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', type: 'warning', onConfirm: null })
+  const [history, setHistory] = useState([])
 
   // Formulaire d'édition
   const [editForm, setEditForm] = useState({
@@ -88,6 +90,15 @@ export default function DossierDetail() {
         motif_instance: rcData?.motif_instance || '',
         date_reception: rcData?.date_reception || ''
       })
+
+      // Récupérer l'historique
+      const { data: histData } = await supabase
+        .from('historique_actions')
+        .select('*')
+        .eq('dossier_id', id)
+        .order('created_at', { ascending: false })
+      
+      setHistory(histData || [])
     } catch (error) {
       console.error(' [DossierDetail] Erreur:', error)
       toast(`Dossier introuvable: ${error.message}`)
@@ -246,7 +257,7 @@ export default function DossierDetail() {
   const detailsRC = dossier.dossier_details_rc?.[0] || null
   const isRC = dossier.niveau === 'RELATION_CLIENT'
   const isLocked = dossier.etat === 'CLOTURE' || dossier.etat === 'ANNULE'
-  const canManageRc = isRC && !isLocked
+  const canManageRc = isRC && !isLocked && role !== 'ADMIN'
   const niveauLabel = { RELATION_CLIENT: 'Relation Client', PRESTATION: 'Prestation', FINANCE: 'Finance' }
   const etatLabel = { EN_COURS: 'En cours', EN_INSTANCE: 'En instance', CLOTURE: 'Clôturé', ANNULE: 'Annulé' }
 
@@ -356,6 +367,15 @@ export default function DossierDetail() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Historique et Timeline */}
+            <div className="bg-white rounded-xl border border-comar-neutral-border p-6 mb-6">
+              <h2 className="text-base font-bold text-comar-navy mb-6 border-b border-comar-neutral-border pb-2 flex items-center gap-2">
+                <svg className="w-5 h-5 text-comar-navy/50" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Historique des Actions (Timeline)
+              </h2>
+              <DossierTimeline history={history} />
             </div>
           </>
         ) : (

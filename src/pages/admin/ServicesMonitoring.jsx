@@ -4,6 +4,8 @@ import AdminLayout from '../../components/AdminLayout'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabaseClient'
 import ConfirmModal from '../../components/ConfirmModal'
+import DossierTimeline from '../../components/DossierTimeline'
+import PerformanceAnalytics from './PerformanceAnalytics'
 
 const DEFAULT_SLA_THRESHOLDS = {
   RELATION_CLIENT: 3,
@@ -337,6 +339,7 @@ function boolBadge(value) {
 
 export default function ServicesMonitoring() {
   const { user } = useAuth()
+  const [activeView, setActiveView] = useState('OPERATIONS') // 'OPERATIONS' or 'ANALYTICS'
 
   const [dossiers, setDossiers] = useState([])
   const [prestationDetails, setPrestationDetails] = useState([])
@@ -361,6 +364,11 @@ export default function ServicesMonitoring() {
   const [slaDraftThresholds, setSlaDraftThresholds] = useState(() => readStoredSlaThresholds())
   const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', type: 'warning', onConfirm: null })
   const [isEditingSla, setIsEditingSla] = useState(false)
+
+  // Historique Modal State
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
+  const [selectedDossierHistory, setSelectedDossierHistory] = useState([])
+  const [selectedDossierName, setSelectedDossierName] = useState('')
 
   useEffect(() => {
     if (!isEditingSla) {
@@ -393,6 +401,47 @@ export default function ServicesMonitoring() {
     setCustomStartDate('')
     setCustomEndDate('')
   }, [])
+
+  const openHistory = async (row) => {
+    setSelectedDossierName(row.souscripteur || row.police_number || row.id)
+    setIsHistoryModalOpen(true)
+    const { data, error } = await supabase
+      .from('historique_actions')
+      .select('*')
+      .eq('dossier_id', row.id)
+      .order('created_at', { ascending: false })
+    
+    if (!error) setSelectedDossierHistory(data || [])
+  }
+
+  const exportToCSV = () => {
+    if (filteredOperations.length === 0) {
+      toast.error('Aucune donnée à exporter.')
+      return
+    }
+    const headers = ['Souscripteur', 'N° Police', 'Service', 'État', 'Doc Complet', 'Quittance', 'Conformité', 'Montant', 'Dernière MAJ', 'Âge', 'SLA', 'Priorité']
+    const rows = filteredOperations.map(r => [
+      `"${r.souscripteur || ''}"`,
+      `"${r.police_number || ''}"`,
+      `"${r.serviceLabel}"`,
+      `"${r.etatLabel}"`,
+      r.documentComplet ? 'Oui' : 'Non',
+      r.quittanceSignee ? 'Oui' : 'Non',
+      r.conformiteValidee ? 'Oui' : 'Non',
+      r.montant || 0,
+      `"${formatDate(r.lastDate)}"`,
+      r.staleDays,
+      r.slaThreshold,
+      r.is_urgent ? 'Oui' : 'Non'
+    ])
+    
+    const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `export_dossiers_${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+  }
 
   const fetchDashboardData = useCallback(async ({ silent = false } = {}) => {
     try {
@@ -1186,10 +1235,27 @@ export default function ServicesMonitoring() {
       <div className="p-6 space-y-6">
         <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-comar-navy">Supervision Opérationnelle</h1>
-            <p className="text-gray-600 mt-1">
-              Vue consolidée Relation Client, Prestation et Finance ({dashboard.dossiersCount} dossiers dans le périmètre filtré)
-            </p>
+            <h1 className="text-3xl font-bold text-comar-navy">Dashboard Administrateur</h1>
+            <div className="mt-2 flex space-x-2 bg-gray-100 p-1 rounded-lg w-max mb-1">
+              <button 
+                onClick={() => setActiveView('OPERATIONS')} 
+                className={`px-4 py-1.5 rounded-md text-sm font-semibold transition ${activeView === 'OPERATIONS' ? 'bg-white shadow-sm text-comar-navy' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Supervision Opérationnelle
+              </button>
+              <button 
+                onClick={() => setActiveView('ANALYTICS')} 
+                className={`px-4 py-1.5 rounded-md text-sm font-semibold transition flex items-center gap-2 ${activeView === 'ANALYTICS' ? 'bg-white shadow-sm text-comar-navy' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                <svg className="w-4 h-4 text-comar-red" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                Analytique & IA
+              </button>
+            </div>
+            {activeView === 'OPERATIONS' && (
+              <p className="text-gray-600 mt-1">
+                Vue consolidée Relation Client, Prestation et Finance ({dashboard.dossiersCount} dossiers dans le périmètre filtré)
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
@@ -1205,6 +1271,10 @@ export default function ServicesMonitoring() {
           </div>
         </div>
 
+        {activeView === 'ANALYTICS' ? (
+          <div className="mt-4"><PerformanceAnalytics /></div>
+        ) : (
+        <>
         <div className="bg-white rounded-xl border border-comar-neutral-border p-5 space-y-4">
           <h2 className="text-lg font-bold text-comar-navy">Filtres et Comparaison</h2>
 
@@ -1377,7 +1447,7 @@ export default function ServicesMonitoring() {
             trend={kpiTrends.active}
           />
           <KpiCard
-            title="Dossiers bloqués"
+            title="Dossiers en retard"
             value={dashboard.globalKpis.blockedCount}
             subtitle="Au-delà des seuils SLA par service"
             valueClassName="text-amber-700"
@@ -1494,13 +1564,13 @@ export default function ServicesMonitoring() {
 
         <div className="bg-white rounded-xl border border-comar-neutral-border overflow-hidden">
           <div className="px-5 py-4 border-b border-comar-neutral-border">
-            <h2 className="text-lg font-bold text-comar-navy">Dossiers Bloqués</h2>
+            <h2 className="text-lg font-bold text-comar-navy">Dossiers en retard</h2>
             <p className="text-sm text-gray-500">Alertes actionnables pour les dossiers au-delà du SLA service</p>
           </div>
 
           {filteredBlockedRows.length === 0 ? (
             <div className="p-6 text-sm text-gray-500">
-              Aucun dossier bloqué sur le périmètre sélectionné.
+              Aucun dossier en retard sur le périmètre sélectionné.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -1609,6 +1679,14 @@ export default function ServicesMonitoring() {
                   {filter.label}
                 </button>
               ))}
+              <div className="h-6 w-px bg-gray-300 mx-1"></div>
+              <button
+                onClick={exportToCSV}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-1 transition"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                Exporter CSV
+              </button>
             </div>
           </div>
 
@@ -1632,6 +1710,7 @@ export default function ServicesMonitoring() {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white/80 uppercase tracking-wider">Âge</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white/80 uppercase tracking-wider">SLA</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-white/80 uppercase tracking-wider">Priorité</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white/80 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-comar-neutral-border">
@@ -1661,6 +1740,15 @@ export default function ServicesMonitoring() {
                         ) : (
                           <span className="text-xs text-gray-500">-</span>
                         )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <button
+                          onClick={() => openHistory(row)}
+                          className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-gray-600 text-white hover:bg-gray-700 flex items-center gap-1 transition"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          Historique
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -1739,6 +1827,8 @@ export default function ServicesMonitoring() {
             </div>
           </div>
         )}
+      </>
+      )}
       </div>
       <ConfirmModal
         isOpen={confirmConfig.isOpen}
@@ -1748,6 +1838,24 @@ export default function ServicesMonitoring() {
         onConfirm={confirmConfig.onConfirm}
         onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
       />
+
+      {isHistoryModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setIsHistoryModalOpen(false)}></div>
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-comar-navy">
+              <div>
+                <h2 className="text-xl font-bold text-white">Historique du dossier</h2>
+                <p className="text-white/70 text-xs mt-1">{selectedDossierName}</p>
+              </div>
+              <button onClick={() => setIsHistoryModalOpen(false)} className="text-white/60 hover:text-white text-2xl">✕</button>
+            </div>
+            <div className="p-6 overflow-y-auto">
+              <DossierTimeline history={selectedDossierHistory} />
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   )
 }
