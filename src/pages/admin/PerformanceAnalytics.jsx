@@ -53,7 +53,7 @@ export default function PerformanceAnalytics() {
     const stats = {
       RELATION_CLIENT: { name: 'Relation Client', backlog: 0, processed: 0, daysTotal: 0, rejets: 0, color: '#003366', icon: FileText },
       PRESTATION: { name: 'Prestation', backlog: 0, processed: 0, daysTotal: 0, rejets: 0, color: '#e60000', icon: Activity },
-      FINANCE: { name: 'Finance', backlog: 0, processed: 0, daysTotal: 0, rejets: 0, color: '#64748b', icon: Clock }
+      FINANCE: { name: 'Finance', backlog: 0, processed: 0, daysTotal: 0, rejets: 0, montantEnAttente: 0, color: '#64748b', icon: Clock }
     }
 
     let slaMet = 0
@@ -72,6 +72,9 @@ export default function PerformanceAnalytics() {
       // Status logic
       if (d.etat !== 'CLOTURE' && d.etat !== 'ANNULE') {
         stats[svc].backlog++
+        if (svc === 'FINANCE' && d.montant) {
+          stats.FINANCE.montantEnAttente += Number(d.montant)
+        }
       } else if (d.etat === 'CLOTURE') {
         timeline[new Date(d.updated_at).toLocaleDateString('fr-FR')] = timeline[new Date(d.updated_at).toLocaleDateString('fr-FR')] || { date: new Date(d.updated_at).toLocaleDateString('fr-FR'), Entrants: 0, Cloturés: 0 }
         timeline[new Date(d.updated_at).toLocaleDateString('fr-FR')].Cloturés++
@@ -112,6 +115,24 @@ export default function PerformanceAnalytics() {
         target: 'FINANCE',
         action: 'Optimisation du circuit de signature',
         detail: `Le temps moyen de paiement atteint ${finAvg.toFixed(1)} jours. Une relance automatique des valideurs financiers doit être activée pour éviter des pénalités de retard.`
+      })
+    }
+
+    if (stats.FINANCE.montantEnAttente > 500000) {
+      const formatMontant = new Intl.NumberFormat('fr-TN', { style: 'currency', currency: 'TND', maximumFractionDigits: 0 }).format(stats.FINANCE.montantEnAttente)
+      actions.push({
+        type: 'critical',
+        target: 'FINANCE / TRÉSORERIE',
+        action: 'Risque sur la Trésorerie Détecté',
+        detail: `Attention : Un montant total très élevé de ${formatMontant} est actuellement en attente de paiement ou de validation. Il est recommandé de débloquer en urgence les gros dossiers pour maintenir la satisfaction client.`
+      })
+    } else if (stats.FINANCE.montantEnAttente > 0) {
+      const formatMontant = new Intl.NumberFormat('fr-TN', { style: 'currency', currency: 'TND', maximumFractionDigits: 0 }).format(stats.FINANCE.montantEnAttente)
+      actions.push({
+        type: 'info',
+        target: 'FINANCE',
+        action: 'Suivi des engagements',
+        detail: `Le volume financier en cours de traitement est de ${formatMontant}. La fluidité des validations est sous contrôle.`
       })
     }
 
