@@ -27,7 +27,7 @@ export default function PerformanceAnalytics() {
   const fetchData = async () => {
     try {
       setLoading(true)
-      let queryDossiers = supabase.from('dossiers').select('id, etat, niveau, created_at, updated_at')
+      let queryDossiers = supabase.from('dossiers').select('id, etat, niveau, created_at, updated_at, dossier_details_prestation ( montant )')
       if (startDate) queryDossiers = queryDossiers.gte('created_at', startDate)
       if (endDate) queryDossiers = queryDossiers.lte('created_at', endDate + 'T23:59:59')
       
@@ -72,8 +72,9 @@ export default function PerformanceAnalytics() {
       // Status logic
       if (d.etat !== 'CLOTURE' && d.etat !== 'ANNULE') {
         stats[svc].backlog++
-        if (svc === 'FINANCE' && d.montant) {
-          stats.FINANCE.montantEnAttente += Number(d.montant)
+        const montantDossier = d.dossier_details_prestation?.[0]?.montant || d.dossier_details_prestation?.montant
+        if (svc === 'FINANCE' && montantDossier) {
+          stats.FINANCE.montantEnAttente += Number(montantDossier)
         }
         
         // SLA Proactivity logic
@@ -143,9 +144,9 @@ export default function PerformanceAnalytics() {
     const totalBreached = (stats.RELATION_CLIENT.slaBreached || 0) + (stats.PRESTATION.slaBreached || 0) + (stats.FINANCE.slaBreached || 0)
     
     if (totalBreached > 0) {
-      actions.push({ type: 'danger', target: 'ALERTES SLA', action: 'Retards confirmés', detail: `${totalBreached} dossiers ont déjà dépassé le délai légal (SLA > 5 jours). Priorisation absolue nécessaire.` })
+      actions.push({ type: 'danger', target: 'ALERTES SLA', action: 'Retards confirmés', detail: `${totalBreached} dossier${totalBreached > 1 ? 's ont' : ' a'} déjà dépassé le délai légal (SLA > 5 jours). Priorisation absolue nécessaire.` })
     } else if (totalImminent > 0) {
-      actions.push({ type: 'warning', target: 'ALERTES SLA', action: 'Risque Imminent (J-1)', detail: `${totalImminent} dossiers expirent dans moins de 24h. Traitement proactif requis pour éviter un dépassement.` })
+      actions.push({ type: 'warning', target: 'ALERTES SLA', action: 'Risque Imminent (J-1)', detail: `${totalImminent} dossier${totalImminent > 1 ? 's expirent' : ' expire'} dans moins de 24h. Traitement proactif requis pour éviter un dépassement.` })
     } else {
       actions.push({ type: 'success', target: 'ALERTES SLA', action: 'Conformité Globale', detail: `Aucun dossier ne risque de dépasser le délai légal (SLA) à court terme. Qualité de service optimale.` })
     }
