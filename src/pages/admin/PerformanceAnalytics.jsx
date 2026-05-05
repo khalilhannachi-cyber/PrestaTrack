@@ -98,67 +98,36 @@ export default function PerformanceAnalytics() {
 
     const actions = []
     
-    // --- 1. Alertes de Goulot et Délai ---
-    if (stats.PRESTATION.backlog >= 1 || stats.FINANCE.backlog >= 1) {
-      actions.push({
-        type: 'critical',
-        target: 'PRESTATION / FINANCE',
-        action: 'Réaffectation immédiate requise',
-        detail: `Le goulot d'étranglement est critique (${stats.PRESTATION.backlog} dossiers en retard en Prestation, ${stats.FINANCE.backlog} en Finance). Il est recommandé de transférer temporairement des gestionnaires de la RC pour résorber le flux.`
-      })
+    // --- 1. Analyse Relation Client (RC) ---
+    if (stats.RELATION_CLIENT.backlog > 5) {
+      actions.push({ type: 'danger', target: 'SERVICE RELATION CLIENT', action: 'Surcharge à l\'accueil', detail: `Le service RC est actuellement sous pression avec ${stats.RELATION_CLIENT.backlog} dossiers en retard. Pensez à mobiliser plus de conseillers.` })
+    } else {
+      actions.push({ type: 'info', target: 'SERVICE RELATION CLIENT', action: 'Flux contrôlé', detail: `Le service RC gère bien la charge actuelle (${stats.RELATION_CLIENT.backlog} dossiers en attente). Taux de traitement optimal.` })
     }
 
+    // --- 2. Analyse Prestation ---
+    if (stats.PRESTATION.backlog > 3) {
+      actions.push({ type: 'critical', target: 'SERVICE PRESTATION', action: 'Goulot d\'étranglement', detail: `Le service Prestation accuse un retard sur ${stats.PRESTATION.backlog} dossiers. Une réaffectation temporaire de ressources est recommandée.` })
+    } else {
+      actions.push({ type: 'info', target: 'SERVICE PRESTATION', action: 'Traitement fluide', detail: `Le service Prestation est à jour dans la vérification de conformité et des quittances (${stats.PRESTATION.backlog} en attente).` })
+    }
+
+    // --- 3. Analyse Finance ---
     const finAvg = stats.FINANCE.processed ? (stats.FINANCE.daysTotal / stats.FINANCE.processed) : 0
-    if (finAvg > 0) {
-      actions.push({
-        type: 'warning',
-        target: 'FINANCE',
-        action: 'Optimisation du circuit de signature',
-        detail: `Le temps moyen de paiement atteint ${finAvg.toFixed(1)} jours. Une relance automatique des valideurs financiers doit être activée pour éviter des pénalités de retard.`
-      })
+    if (stats.FINANCE.backlog > 2 || finAvg > 3) {
+      actions.push({ type: 'warning', target: 'SERVICE FINANCE', action: 'Optimisation des signatures', detail: `Retard détecté en Finance (${stats.FINANCE.backlog} dossiers en attente, délai moyen: ${finAvg.toFixed(1)}j). Relancez les valideurs financiers.` })
+    } else {
+      actions.push({ type: 'info', target: 'SERVICE FINANCE', action: 'Paiements dans les temps', detail: `Le service Finance valide les dossiers efficacement. Le délai de paiement est respecté (${stats.FINANCE.backlog} en attente).` })
     }
 
+    // --- 4. Analyse Flux de Monnaie (Trésorerie) ---
+    const formatMontant = new Intl.NumberFormat('fr-TN', { style: 'currency', currency: 'TND', maximumFractionDigits: 0 }).format(stats.FINANCE.montantEnAttente || 0)
     if (stats.FINANCE.montantEnAttente > 500000) {
-      const formatMontant = new Intl.NumberFormat('fr-TN', { style: 'currency', currency: 'TND', maximumFractionDigits: 0 }).format(stats.FINANCE.montantEnAttente)
-      actions.push({
-        type: 'critical',
-        target: 'FINANCE / TRÉSORERIE',
-        action: 'Risque sur la Trésorerie Détecté',
-        detail: `Attention : Un montant total très élevé de ${formatMontant} est actuellement en attente de paiement ou de validation. Il est recommandé de débloquer en urgence les gros dossiers pour maintenir la satisfaction client.`
-      })
+      actions.push({ type: 'critical', target: 'FLUX DE TRÉSORERIE', action: 'Risque de liquidité', detail: `Un montant critique de ${formatMontant} est bloqué en attente de validation. Action immédiate requise par la Direction Financière.` })
     } else if (stats.FINANCE.montantEnAttente > 0) {
-      const formatMontant = new Intl.NumberFormat('fr-TN', { style: 'currency', currency: 'TND', maximumFractionDigits: 0 }).format(stats.FINANCE.montantEnAttente)
-      actions.push({
-        type: 'info',
-        target: 'FINANCE',
-        action: 'Suivi des engagements',
-        detail: `Le volume financier en cours de traitement est de ${formatMontant}. La fluidité des validations est sous contrôle.`
-      })
-    }
-
-    if (stats.RELATION_CLIENT.rejets >= 0 && stats.RELATION_CLIENT.processed > 0) {
-      actions.push({
-        type: 'danger',
-        target: 'QUALITÉ',
-        action: 'Refonte du Guide de Contrôle',
-        detail: `Attention au taux de rejet actuel. Une mise à jour du guide de contrôle de la Relation Client s'impose d'urgence.`
-      })
-    }
-
-    const timelineArr = Object.values(timeline).sort((a, b) => new Date(a.date.split('/').reverse().join('-')) - new Date(b.date.split('/').reverse().join('-')))
-
-    // --- 2. Analyse de Tendance (Prédiction de Dégradation SLA) ---
-    if (timelineArr.length >= 1) {
-      const recent = timelineArr.slice(-3)
-      const isOverloaded = recent.some(d => d.Entrants >= d.Cloturés)
-      if (isOverloaded) {
-        actions.push({
-          type: 'critical',
-          target: 'CAPACITÉ',
-          action: 'Alerte Surcharge Structurelle',
-          detail: `Le flux entrant dépasse ou égale la capacité de clôture récemment. Le SLA global va chuter. Recommandation: Autoriser des heures supplémentaires ce weekend.`
-        })
-      }
+      actions.push({ type: 'info', target: 'FLUX DE TRÉSORERIE', action: 'Suivi des engagements', detail: `Le volume financier en cours de traitement est de ${formatMontant}. La situation est sous contrôle.` })
+    } else {
+      actions.push({ type: 'info', target: 'FLUX DE TRÉSORERIE', action: 'Trésorerie dégagée', detail: `Aucun engagement financier majeur n'est actuellement en souffrance dans le circuit de validation.` })
     }
 
     // --- 3. Détection de Sous-performance / Risque Réseau (Agences) ---
