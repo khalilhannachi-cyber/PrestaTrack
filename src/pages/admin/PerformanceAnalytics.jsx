@@ -101,7 +101,7 @@ export default function PerformanceAnalytics() {
         type: 'critical',
         target: 'PRESTATION / FINANCE',
         action: 'Réaffectation immédiate requise',
-        detail: `Le goulot d'étranglement est critique (${stats.PRESTATION.backlog} dossiers bloqués en Prestation, ${stats.FINANCE.backlog} en Finance). Il est recommandé de transférer temporairement des gestionnaires de la RC pour résorber le flux.`
+        detail: `Le goulot d'étranglement est critique (${stats.PRESTATION.backlog} dossiers en retard en Prestation, ${stats.FINANCE.backlog} en Finance). Il est recommandé de transférer temporairement des gestionnaires de la RC pour résorber le flux.`
       })
     }
 

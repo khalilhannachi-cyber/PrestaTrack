@@ -1402,7 +1402,7 @@ export default function ServicesMonitoring() {
             trend={kpiTrends.active}
           />
           <KpiCard
-            title="Dossiers bloqués"
+            title="Dossiers en retard"
             value={dashboard.globalKpis.blockedCount}
             subtitle="Au-delà des seuils SLA par service"
             valueClassName="text-amber-700"
@@ -1519,13 +1519,13 @@ export default function ServicesMonitoring() {
 
         <div className="bg-white rounded-xl border border-comar-neutral-border overflow-hidden">
           <div className="px-5 py-4 border-b border-comar-neutral-border">
-            <h2 className="text-lg font-bold text-comar-navy">Dossiers Bloqués</h2>
+            <h2 className="text-lg font-bold text-comar-navy">Dossiers en retard</h2>
             <p className="text-sm text-gray-500">Alertes actionnables pour les dossiers au-delà du SLA service</p>
           </div>
 
           {filteredBlockedRows.length === 0 ? (
             <div className="p-6 text-sm text-gray-500">
-              Aucun dossier bloqué sur le périmètre sélectionné.
+              Aucun dossier en retard sur le périmètre sélectionné.
             </div>
           ) : (
             <div className="overflow-x-auto">
