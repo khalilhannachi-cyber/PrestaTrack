@@ -9,6 +9,8 @@ import { formatRequestNumber } from '../../lib/requestNumber'
 import { useAuth } from '../../contexts/AuthContext'
 // Layout spécifique aux pages Prestation
 import PrestationLayout from '../../components/PrestationLayout'
+// Composant Timeline
+import DossierTimeline from '../../components/DossierTimeline'
 
 /**
  * Dashboard des prestations
@@ -18,7 +20,7 @@ import PrestationLayout from '../../components/PrestationLayout'
  * @returns {React.ReactNode} La page dashboard dans le PrestationLayout
  */
 export default function PrestationDashboard() {
-  const { user } = useAuth() // Récupération de l'utilisateur connecté
+  const { user, role } = useAuth() // Récupération de l'utilisateur connecté
   const navigate = useNavigate() // Navigation programmatique
   const [dossiers, setDossiers] = useState([]) // Liste des dossiers
   const [loading, setLoading] = useState(true) // Indicateur de chargement
@@ -34,6 +36,9 @@ export default function PrestationDashboard() {
     document_complet: false,
     quittance_signee: false
   })
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
+  const [selectedDossierHistory, setSelectedDossierHistory] = useState([])
+  const [selectedDossierName, setSelectedDossierName] = useState('')
 
   // Chargement des dossiers au montage du composant
   useEffect(() => {
@@ -208,6 +213,18 @@ export default function PrestationDashboard() {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }))
+  }
+
+  const openHistory = async (dossier) => {
+    setSelectedDossierName(dossier.souscripteur)
+    setIsHistoryModalOpen(true)
+    const { data, error } = await supabase
+      .from('historique_actions')
+      .select('*')
+      .eq('dossier_id', dossier.id)
+      .order('created_at', { ascending: false })
+    
+    if (!error) setSelectedDossierHistory(data || [])
   }
 
   /**
@@ -926,11 +943,11 @@ export default function PrestationDashboard() {
                     const isQuittanceSignee = detailsPrestation.quittance_signee === true
 
                     // Désactiver tous les boutons si niveau != PRESTATION
-                    const canEdit = isNiveauPrestation && !isLocked && !isSaving
+                    const canEdit = isNiveauPrestation && !isLocked && !isSaving && role !== 'ADMIN'
                     // "Pièces à traiter" actif uniquement si doc complet et niveau PRESTATION
-                    const canMarkPieces = isNiveauPrestation && !isLocked && isDocumentComplet && !isSaving
+                    const canMarkPieces = isNiveauPrestation && !isLocked && isDocumentComplet && !isSaving && role !== 'ADMIN'
                     // Désactiver "Transfert quittance" si le document n'est pas complet OU quittance_signee = false OU niveau != PRESTATION
-                    const canTransferQuittance = isNiveauPrestation && !isLocked && isDocumentComplet && isQuittanceSignee && !isSaving
+                    const canTransferQuittance = isNiveauPrestation && !isLocked && isDocumentComplet && isQuittanceSignee && !isSaving && role !== 'ADMIN'
 
                     return (
                       <tr key={dossier.id} className="hover:bg-comar-navy-50/30 transition-colors duration-150">
@@ -988,6 +1005,14 @@ export default function PrestationDashboard() {
                         {/* Actions */}
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <div className="flex gap-2">
+                            <button
+                              onClick={() => openHistory(dossier)}
+                              className="px-3 py-1 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded transition text-xs font-semibold flex items-center gap-1"
+                              title="Voir l'historique"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                              Historique
+                            </button>
                             <button
                               onClick={() => openEditModal(dossier)}
                               disabled={!canEdit}
@@ -1047,6 +1072,14 @@ export default function PrestationDashboard() {
                               }
                             >
                                Transfert quittance
+                            </button>
+                            <button
+                              onClick={() => openHistory(dossier)}
+                              className="px-3 py-1 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded transition text-xs font-semibold flex items-center gap-1"
+                              title="Voir l'historique"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                              Historique
                             </button>
                           </div>
                         </td>
@@ -1301,6 +1334,25 @@ export default function PrestationDashboard() {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal d'historique */}
+        {isHistoryModalOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={() => setIsHistoryModalOpen(false)}></div>
+            <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-comar-navy">
+                <div>
+                  <h2 className="text-xl font-bold text-white">Historique du dossier</h2>
+                  <p className="text-white/70 text-xs mt-1">{selectedDossierName}</p>
+                </div>
+                <button onClick={() => setIsHistoryModalOpen(false)} className="text-white/60 hover:text-white text-2xl">✕</button>
+              </div>
+              <div className="p-6 overflow-y-auto">
+                <DossierTimeline history={selectedDossierHistory} />
               </div>
             </div>
           </div>

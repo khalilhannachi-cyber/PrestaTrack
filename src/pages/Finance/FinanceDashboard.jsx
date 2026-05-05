@@ -10,6 +10,8 @@ import FinanceLayout from '../../components/FinanceLayout'
 // Utilitaire d'enregistrement des actions Finance
 import { logFinanceAction } from '../../lib/logFinanceAction'
 import { formatRequestNumber } from '../../lib/requestNumber'
+// Composant Timeline
+import DossierTimeline from '../../components/DossierTimeline'
 
 /**
  * Dashboard Finance
@@ -25,7 +27,7 @@ import { formatRequestNumber } from '../../lib/requestNumber'
  * @returns {React.ReactNode} La page dashboard dans le FinanceLayout
  */
 export default function FinanceDashboard() {
-  const { user } = useAuth() // Récupération de l'utilisateur connecté
+  const { user, role } = useAuth() // Récupération de l'utilisateur connecté
   const [dossiers, setDossiers] = useState([]) // Liste des dossiers
   const [loading, setLoading] = useState(true) // Indicateur de chargement
   const [error, setError] = useState(null) // Erreur éventuelle
@@ -39,6 +41,9 @@ export default function FinanceDashboard() {
     moyen_paiement: 'VIREMENT',
     commentaire_finance: ''
   })
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
+  const [selectedDossierHistory, setSelectedDossierHistory] = useState([])
+  const [selectedDossierName, setSelectedDossierName] = useState('')
 
   // Chargement des dossiers au montage du composant
   useEffect(() => {
@@ -265,6 +270,18 @@ export default function FinanceDashboard() {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const openHistory = async (dossier) => {
+    setSelectedDossierName(dossier.souscripteur)
+    setIsHistoryModalOpen(true)
+    const { data, error } = await supabase
+      .from('historique_actions')
+      .select('*')
+      .eq('dossier_id', dossier.id)
+      .order('created_at', { ascending: false })
+    
+    if (!error) setSelectedDossierHistory(data || [])
   }
 
   /**
@@ -668,7 +685,8 @@ Cette action clôturera définitivement le dossier.`
                       detailsFinance.conformite_validee === true &&
                       dossier.etat !== 'CLOTURE' &&
                       dossier.etat !== 'ANNULE' &&
-                      !isSaving
+                      !isSaving &&
+                      role !== 'ADMIN'
 
                     return (
                       <tr key={dossier.id} className="hover:bg-comar-navy-50/30 transition-colors duration-150 align-top">
@@ -694,13 +712,21 @@ Cette action clôturera définitivement le dossier.`
                         <td className="px-3 py-3"><EtatBadge etat={dossier.etat} /></td>
                         <td className="px-3 py-3">
                           <div className="flex flex-col gap-2">
+                            <button
+                               onClick={() => openHistory(dossier)}
+                               className="w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 bg-gray-600 text-white text-[11px] font-semibold rounded-md hover:bg-gray-700 transition"
+                               title="Voir l'historique"
+                             >
+                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                               Historique
+                             </button>
                             {!quittanceSignee && (
                               <p className="text-xs font-semibold text-red-600 leading-snug">Paiement impossible : quittance non signée.</p>
                             )}
 
                             <button
                               onClick={() => openConformiteModal(dossier)}
-                              disabled={!quittanceSignee || isSaving || dossier.etat === 'CLOTURE' || dossier.etat === 'ANNULE'}
+                              disabled={!quittanceSignee || isSaving || dossier.etat === 'CLOTURE' || dossier.etat === 'ANNULE' || role === 'ADMIN'}
                               title={
                                 !quittanceSignee
                                   ? 'Quittance non signée'
@@ -755,7 +781,8 @@ Cette action clôturera définitivement le dossier.`
                   detailsFinance.conformite_validee === true &&
                   dossier.etat !== 'CLOTURE' &&
                   dossier.etat !== 'ANNULE' &&
-                  !isSaving
+                  !isSaving &&
+                  role !== 'ADMIN'
 
                 return (
                   <div key={dossier.id} className="p-4 sm:p-5 space-y-3">
@@ -797,6 +824,13 @@ Cette action clôturera définitivement le dossier.`
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <button
+                         onClick={() => openHistory(dossier)}
+                         className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-600 text-white text-xs font-semibold rounded-xl hover:bg-gray-700 transition"
+                       >
+                         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                         Voir l'historique
+                       </button>
+                      <button
                         onClick={() => openConformiteModal(dossier)}
                         disabled={!quittanceSignee || isSaving || dossier.etat === 'CLOTURE' || dossier.etat === 'ANNULE'}
                         title={
@@ -831,6 +865,13 @@ Cette action clôturera définitivement le dossier.`
                       >
                         Confirmer paiement
                       </button>
+                      <button
+                         onClick={() => openHistory(dossier)}
+                         className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-200 transition"
+                       >
+                         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                         Voir l'historique
+                       </button>
                     </div>
                   </div>
                 )
@@ -1067,6 +1108,25 @@ Cette action clôturera définitivement le dossier.`
         </div>
       )}
 
+
+        {/* Modal d'historique */}
+        {isHistoryModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={() => setIsHistoryModalOpen(false)}></div>
+            <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-comar-navy text-white">
+                <div className="text-left">
+                  <h2 className="text-xl font-bold">Historique du dossier</h2>
+                  <p className="text-white/70 text-xs mt-1">{selectedDossierName}</p>
+                </div>
+                <button onClick={() => setIsHistoryModalOpen(false)} className="text-white/60 hover:text-white text-2xl">✕</button>
+              </div>
+              <div className="p-6 overflow-y-auto text-left">
+                <DossierTimeline history={selectedDossierHistory} />
+              </div>
+            </div>
+          </div>
+        )}
     </FinanceLayout>
   )
 }

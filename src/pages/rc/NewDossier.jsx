@@ -25,7 +25,7 @@ const POLICE_NUMBER_REGEX = /^\d{8}-\d$/
  */
 export default function NewDossier() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, role } = useAuth()
   const [loading, setLoading] = useState(false)
   const [agences, setAgences] = useState([])
   const [loadingAgences, setLoadingAgences] = useState(true)
@@ -69,6 +69,10 @@ export default function NewDossier() {
    * @param {'RELATION_CLIENT'|'PRESTATION'} niveau
    */
   const handleSave = async (niveau) => {
+    if (role === 'ADMIN') {
+      toast.error("Mode supervision : Action non autorisée.")
+      return
+    }
     // Validation manuelle des champs requis
     if (!formData.souscripteur || !formData.police_number || !formData.agence_id || !formData.motif_instance) {
       toast.error("Veuillez remplir tous les champs obligatoires (*).")
@@ -340,30 +344,39 @@ export default function NewDossier() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3 pt-6 border-t border-comar-neutral-border">
-            <button type="button" disabled={loading} onClick={() => handleSave('RELATION_CLIENT')}
-              className="flex-1 min-w-[160px] bg-comar-neutral-bg text-comar-navy px-5 py-2.5 rounded-xl font-semibold hover:bg-comar-neutral-border disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 text-sm cursor-pointer">
-              {loading ? (
-                <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg> Enregistrement...</>
-              ) : (
-                <><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" /></svg> Enregistrer</>
-              )}
-            </button>
+          {role !== 'ADMIN' ? (
+            <div className="flex flex-wrap gap-3 pt-6 border-t border-comar-neutral-border">
+              <button type="button" disabled={loading} onClick={() => handleSave('RELATION_CLIENT')}
+                className="flex-1 min-w-[160px] bg-comar-neutral-bg text-comar-navy px-5 py-2.5 rounded-xl font-semibold hover:bg-comar-neutral-border disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 text-sm cursor-pointer">
+                {loading ? (
+                  <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg> Enregistrement...</>
+                ) : (
+                  <><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" /></svg> Enregistrer</>
+                )}
+              </button>
 
-            <button type="button" disabled={loading} onClick={() => handleSave('PRESTATION')}
-              className="flex-1 min-w-[160px] bg-comar-navy text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-comar-navy-light disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 text-sm shadow-sm hover:shadow-md cursor-pointer">
-              {loading ? (
-                <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg> Envoi en cours...</>
-              ) : (
-                <><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg> Envoyer</>
-              )}
-            </button>
+              <button type="button" disabled={loading} onClick={() => handleSave('PRESTATION')}
+                className="flex-1 min-w-[160px] bg-comar-navy text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-comar-navy-light disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 text-sm shadow-sm hover:shadow-md cursor-pointer">
+                {loading ? (
+                  <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg> Envoi en cours...</>
+                ) : (
+                  <><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg> Envoyer</>
+                )}
+              </button>
 
-            <button type="button" onClick={() => navigate('/rc/dossiers')} disabled={loading}
-              className="px-5 py-2.5 bg-white text-gray-500 border border-comar-neutral-border rounded-xl font-semibold hover:bg-comar-neutral-bg disabled:opacity-50 transition-all duration-200 text-sm cursor-pointer">
-              Annuler
-            </button>
-          </div>
+              <button type="button" onClick={() => navigate('/rc/dossiers')} disabled={loading}
+                className="px-5 py-2.5 bg-white text-gray-500 border border-comar-neutral-border rounded-xl font-semibold hover:bg-comar-neutral-bg disabled:opacity-50 transition-all duration-200 text-sm cursor-pointer">
+                Annuler
+              </button>
+            </div>
+          ) : (
+            <div className="flex justify-center pt-6 border-t border-comar-neutral-border">
+              <button type="button" onClick={() => navigate('/rc/dossiers')}
+                className="bg-comar-navy text-white px-8 py-3 rounded-xl font-bold hover:bg-comar-navy-light transition-all shadow-md">
+                Retour à la liste
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </RCLayout>

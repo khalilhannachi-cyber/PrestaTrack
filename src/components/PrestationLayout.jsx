@@ -17,7 +17,7 @@ import comarLogo from '../assets/LogoCOMAR.png'
 export default function PrestationLayout({ children }) {
   const navigate = useNavigate() // Hook pour la navigation programmatique
   const location = useLocation() // Hook pour obtenir la route actuelle
-  const { user, signOut } = useAuth() // Récupération des données utilisateur et fonction de déconnexion
+  const { user, signOut, role } = useAuth() // Récupération des données utilisateur et fonction de déconnexion
 
   /**
    * Gère la déconnexion de l'utilisateur
@@ -98,6 +98,17 @@ export default function PrestationLayout({ children }) {
 
       {/* Contenu principal */}
       <main>
+        {role === 'ADMIN' && (
+          <div className="bg-comar-red text-white px-6 py-2 flex items-center justify-between shadow-lg sticky top-[56px] z-30">
+            <div className="flex items-center gap-2">
+              <span className="animate-pulse">🔴</span>
+              <span className="font-bold text-xs tracking-wide uppercase">Mode Supervision — Lecture Seule</span>
+            </div>
+            <Link to="/admin/monitoring" className="text-[10px] bg-white/20 hover:bg-white/30 px-2 py-1 rounded-full transition-colors font-bold">
+              Quitter la vue
+            </Link>
+          </div>
+        )}
         {children}
       </main>
     </div>
