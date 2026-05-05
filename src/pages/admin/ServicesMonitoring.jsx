@@ -1783,6 +1783,8 @@ export default function ServicesMonitoring() {
             </div>
           </div>
         )}
+      </>
+      )}
       </div>
 
       {isHistoryModalOpen && (
@@ -1801,8 +1803,6 @@ export default function ServicesMonitoring() {
             </div>
           </div>
         </div>
-      )}
-      </>
       )}
     </AdminLayout>
   )
