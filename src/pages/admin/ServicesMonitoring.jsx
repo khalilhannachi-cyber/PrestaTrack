@@ -4,6 +4,7 @@ import AdminLayout from '../../components/AdminLayout'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabaseClient'
 import DossierTimeline from '../../components/DossierTimeline'
+import PerformanceAnalytics from './PerformanceAnalytics'
 
 const DEFAULT_SLA_THRESHOLDS = {
   RELATION_CLIENT: 3,
@@ -337,6 +338,7 @@ function boolBadge(value) {
 
 export default function ServicesMonitoring() {
   const { user } = useAuth()
+  const [activeView, setActiveView] = useState('OPERATIONS') // 'OPERATIONS' or 'ANALYTICS'
 
   const [dossiers, setDossiers] = useState([])
   const [prestationDetails, setPrestationDetails] = useState([])
@@ -1188,10 +1190,27 @@ export default function ServicesMonitoring() {
       <div className="p-6 space-y-6">
         <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-comar-navy">Supervision Opérationnelle</h1>
-            <p className="text-gray-600 mt-1">
-              Vue consolidée Relation Client, Prestation et Finance ({dashboard.dossiersCount} dossiers dans le périmètre filtré)
-            </p>
+            <h1 className="text-3xl font-bold text-comar-navy">Dashboard Administrateur</h1>
+            <div className="mt-2 flex space-x-2 bg-gray-100 p-1 rounded-lg w-max mb-1">
+              <button 
+                onClick={() => setActiveView('OPERATIONS')} 
+                className={`px-4 py-1.5 rounded-md text-sm font-semibold transition ${activeView === 'OPERATIONS' ? 'bg-white shadow-sm text-comar-navy' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Supervision Opérationnelle
+              </button>
+              <button 
+                onClick={() => setActiveView('ANALYTICS')} 
+                className={`px-4 py-1.5 rounded-md text-sm font-semibold transition flex items-center gap-2 ${activeView === 'ANALYTICS' ? 'bg-white shadow-sm text-comar-navy' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                <svg className="w-4 h-4 text-comar-red" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                Analytique & IA
+              </button>
+            </div>
+            {activeView === 'OPERATIONS' && (
+              <p className="text-gray-600 mt-1">
+                Vue consolidée Relation Client, Prestation et Finance ({dashboard.dossiersCount} dossiers dans le périmètre filtré)
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
@@ -1207,6 +1226,10 @@ export default function ServicesMonitoring() {
           </div>
         </div>
 
+        {activeView === 'ANALYTICS' ? (
+          <div className="mt-4"><PerformanceAnalytics /></div>
+        ) : (
+        <>
         <div className="bg-white rounded-xl border border-comar-neutral-border p-5 space-y-4">
           <h2 className="text-lg font-bold text-comar-navy">Filtres et Comparaison</h2>
 
@@ -1778,6 +1801,8 @@ export default function ServicesMonitoring() {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </AdminLayout>
   )
