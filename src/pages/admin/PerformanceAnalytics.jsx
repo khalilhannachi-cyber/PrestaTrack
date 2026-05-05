@@ -176,6 +176,8 @@ export default function PerformanceAnalytics() {
       })
     }
 
+    const timelineArr = Object.values(timeline).sort((a, b) => new Date(a.date.split('/').reverse().join('-')) - new Date(b.date.split('/').reverse().join('-')))
+
     const bData = Object.keys(stats).map(key => ({
       name: stats[key].name,
       'Temps Moyen (Jours)': stats[key].processed > 0 ? parseFloat((stats[key].daysTotal / stats[key].processed).toFixed(1)) : 0,
