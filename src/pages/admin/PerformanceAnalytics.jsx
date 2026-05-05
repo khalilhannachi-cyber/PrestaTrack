@@ -75,6 +75,14 @@ export default function PerformanceAnalytics() {
         if (svc === 'FINANCE' && d.montant) {
           stats.FINANCE.montantEnAttente += Number(d.montant)
         }
+        
+        // SLA Proactivity logic
+        const daysOpen = (new Date() - new Date(d.created_at)) / (1000 * 60 * 60 * 24)
+        if (daysOpen >= 4 && daysOpen <= 5) {
+          stats[svc].slaImminent = (stats[svc].slaImminent || 0) + 1
+        } else if (daysOpen > 5) {
+          stats[svc].slaBreached = (stats[svc].slaBreached || 0) + 1
+        }
       } else if (d.etat === 'CLOTURE') {
         timeline[new Date(d.updated_at).toLocaleDateString('fr-FR')] = timeline[new Date(d.updated_at).toLocaleDateString('fr-FR')] || { date: new Date(d.updated_at).toLocaleDateString('fr-FR'), Entrants: 0, Cloturés: 0 }
         timeline[new Date(d.updated_at).toLocaleDateString('fr-FR')].Cloturés++
@@ -128,6 +136,18 @@ export default function PerformanceAnalytics() {
       actions.push({ type: 'info', target: 'FLUX DE TRÉSORERIE', action: 'Suivi des engagements', detail: `Le volume financier en cours de traitement est de ${formatMontant}. La situation est sous contrôle.` })
     } else {
       actions.push({ type: 'info', target: 'FLUX DE TRÉSORERIE', action: 'Trésorerie dégagée', detail: `Aucun engagement financier majeur n'est actuellement en souffrance dans le circuit de validation.` })
+    }
+
+    // --- 5. Analyse Proactive (SLA) ---
+    const totalImminent = (stats.RELATION_CLIENT.slaImminent || 0) + (stats.PRESTATION.slaImminent || 0) + (stats.FINANCE.slaImminent || 0)
+    const totalBreached = (stats.RELATION_CLIENT.slaBreached || 0) + (stats.PRESTATION.slaBreached || 0) + (stats.FINANCE.slaBreached || 0)
+    
+    if (totalBreached > 0) {
+      actions.push({ type: 'danger', target: 'ALERTES SLA', action: 'Retards confirmés', detail: `${totalBreached} dossiers ont déjà dépassé le délai légal (SLA > 5 jours). Priorisation absolue nécessaire.` })
+    } else if (totalImminent > 0) {
+      actions.push({ type: 'warning', target: 'ALERTES SLA', action: 'Risque Imminent (J-1)', detail: `${totalImminent} dossiers expirent dans moins de 24h. Traitement proactif requis pour éviter un dépassement.` })
+    } else {
+      actions.push({ type: 'success', target: 'ALERTES SLA', action: 'Conformité Globale', detail: `Aucun dossier ne risque de dépasser le délai légal (SLA) à court terme. Qualité de service optimale.` })
     }
 
     // --- 3. Détection de Sous-performance / Risque Réseau (Agences) ---
